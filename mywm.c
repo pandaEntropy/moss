@@ -1,23 +1,42 @@
 #include <X11/Xlib.h>
+#include <X11/X.h>
+#include <stdbool.h>
+#include <X11/cursorfont.h>
 
 #define MAX(a, b) ((a) > (b) ? (a) : (b))
 
+Display* dpy;
+XWindowAttributes attr;
+XButtonEvent start;
+XEvent ev;
+Window root;
+
+void grabKey(char* key, unsigned int mod){
+	KeySym sym = XStringToKeysym(key);
+	KeyCode code = XKeysymToKeycode(dpy, sym);
+	XGrabKey(dpy, code, mod, DefaultRootWindow(dpy), false, GrabModeAsync, GrabModeAsync);
+}
+
+
 int main(void)
 {
-    Display * dpy;
-    XWindowAttributes attr;
-    XButtonEvent start;
-    XEvent ev;
-
+	
     if(!(dpy = XOpenDisplay(0x0))) return 1;
-
-    XGrabKey(dpy, XKeysymToKeycode(dpy, XStringToKeysym("F1")), Mod1Mask,
-            DefaultRootWindow(dpy), True, GrabModeAsync, GrabModeAsync);
-    XGrabButton(dpy, 1, Mod1Mask, DefaultRootWindow(dpy), True,
+	
+	root = DefaultRootWindow(dpy);
+	
+	//Recieve KeyPress event when "F1" + alt is pressed
+    grabKey("F1", Mod1Mask);
+	XGrabButton(dpy, 1, Mod1Mask, root, True,
             ButtonPressMask|ButtonReleaseMask|PointerMotionMask, GrabModeAsync, GrabModeAsync, None, None);
-    XGrabButton(dpy, 3, Mod1Mask, DefaultRootWindow(dpy), True,
+    XGrabButton(dpy, 3, Mod1Mask, root, True,
             ButtonPressMask|ButtonReleaseMask|PointerMotionMask, GrabModeAsync, GrabModeAsync, None, None);
+	
+	//Create and define the cursor
+	Cursor cursor = XCreateFontCursor(dpy, XC_left_ptr);
+	XDefineCursor(dpy, DefaultRootWindow(dpy), cursor);
 
+	XSync(dpy, false);
     start.subwindow = None;
     for(;;)
     {
@@ -42,6 +61,7 @@ int main(void)
         else if(ev.type == ButtonRelease)
             start.subwindow = None;
     }
+	XCloseDisplay(dpy);
 }
 
 

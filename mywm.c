@@ -1,3 +1,4 @@
+#include "mywm.h"
 #include <X11/Xlib.h>
 #include <X11/X.h>
 #include <stdbool.h>
@@ -7,17 +8,23 @@
 #define MAX(a, b) ((a) > (b) ? (a) : (b))
 
 Display* dpy;
+int sw; //screen width
+int sh; //screen height
+int screen;  
 XWindowAttributes attr;
 XButtonEvent start;
 XEvent ev;
 Window root;
+Window clients[128];
+int nclients = 0;
+
 
 void grabKey(char* key, unsigned int mod){
     KeySym sym = XStringToKeysym(key);
     KeyCode code = XKeysymToKeycode(dpy, sym);
     XGrabKey(dpy, code, mod, DefaultRootWindow(dpy), false, GrabModeAsync, GrabModeAsync);
 }
-
+/*
 void Frame(Window w){
     unsigned int BORDER_WIDTH = 3;
     unsigned long BORDER_COLOR = 0xff0000;
@@ -41,11 +48,12 @@ void Frame(Window w){
 
     XMapWindow(dpy, frame);
 }
-
+*/
 void OnMapRequest(XMapRequestEvent* ev){
-    Frame(ev->window);
+    //Frame(ev->window);
 
     XMapWindow(dpy, ev->window);
+    manage(ev->window);
 }
 
 void OnConfigureRequest(XConfigureRequestEvent* ev){
@@ -61,12 +69,35 @@ void OnConfigureRequest(XConfigureRequestEvent* ev){
 
     XConfigureWindow(dpy, ev->window, ev->value_mask, &changes);
 }
-        
+
+void Tile(){
+    for(int i = 0; i < nclients; i++){
+        int h = sh;
+        int w = sw / nclients;
+
+        int x = w * i;
+        int y = 0;
+
+        XMoveResizeWindow(dpy, clients[i], x, y, w, h);
+        printf("Window %d: x%d, width%d\n", i, x, w);
+        printf("height = %d, width = %d\n", sh, sw);
+    }    
+}
+
+void manage(Window w){
+    clients[nclients] = w;
+    nclients++;        
+    Tile();
+}
+      
 int main(void)
 {
     
     if(!(dpy = XOpenDisplay(0x0))) return 1;
     
+    screen = DefaultScreen(dpy);
+    sw = DisplayWidth(dpy, screen);
+    sh = DisplayHeight(dpy, screen);
     root = DefaultRootWindow(dpy);
 
     XSelectInput(dpy, root, SubstructureRedirectMask | SubstructureNotifyMask);
@@ -119,11 +150,11 @@ int main(void)
 
             case ConfigureRequest:
                 OnConfigureRequest(&ev.xconfigurerequest);
-            break;    
+                break;    
 
             case MapRequest:
                 OnMapRequest(&ev.xmaprequest);
-            break;    
+                break;    
         }
     }
     XCloseDisplay(dpy);

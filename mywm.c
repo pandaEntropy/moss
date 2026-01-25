@@ -70,6 +70,10 @@ void OnConfigureRequest(XConfigureRequestEvent* ev){
     XConfigureWindow(dpy, ev->window, ev->value_mask, &changes);
 }
 
+void OnDestroyNotify(XDestroyWindowEvent* ev){
+    unmanage(ev->window);        
+}
+
 void Tile(){
     for(int i = 0; i < nclients; i++){
         int h = sh;
@@ -80,13 +84,25 @@ void Tile(){
 
         XMoveResizeWindow(dpy, clients[i], x, y, w, h);
         printf("Window %d: x%d, width%d\n", i, x, w);
-        printf("height = %d, width = %d\n", sh, sw);
     }    
 }
 
 void manage(Window w){
     clients[nclients] = w;
     nclients++;        
+    Tile();
+}
+
+void unmanage(Window w){
+    for(int i = 0; i < nclients; i++){
+        if(clients[i] == w){
+            for(int j = i; j < nclients-1; j++){
+                clients[j] = clients[j+1];    
+            }
+            nclients--;
+            break;
+        }
+    }
     Tile();
 }
       
@@ -103,7 +119,7 @@ int main(void)
     XSelectInput(dpy, root, SubstructureRedirectMask | SubstructureNotifyMask);
     
     //Recieve KeyPress event when "F1" + alt is pressed
-    grabKey("F1", Mod1Mask);
+    grabKey("R", Mod1Mask);
     XGrabButton(dpy, 1, Mod1Mask, root, True,
             ButtonPressMask|ButtonReleaseMask|PointerMotionMask, GrabModeAsync, GrabModeAsync, None, None);
     XGrabButton(dpy, 3, Mod1Mask, root, True,
@@ -121,10 +137,9 @@ int main(void)
         //printf("event: %d\n", ev.type);
         switch(ev.type){    
             case KeyPress:
-                if(ev.xkey.subwindow != None)
-                    XRaiseWindow(dpy, ev.xkey.subwindow);
+                Tile();
                 break;
-            
+
             case ButtonPress:
                 if(ev.xbutton.subwindow != None){
                     XGetWindowAttributes(dpy, ev.xbutton.subwindow, &attr);
@@ -154,7 +169,11 @@ int main(void)
 
             case MapRequest:
                 OnMapRequest(&ev.xmaprequest);
-                break;    
+                break;
+
+            case DestroyNotify:
+                OnDestroyNotify(&ev.xdestroywindow);
+                break;
         }
     }
     XCloseDisplay(dpy);

@@ -13,4 +13,6 @@ void Tile();
 
 void manage(Window w);
 
+void unmanage(Window w);
+
 #endif

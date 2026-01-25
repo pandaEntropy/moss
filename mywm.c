@@ -118,7 +118,7 @@ int main(void)
 
     XSelectInput(dpy, root, SubstructureRedirectMask | SubstructureNotifyMask);
     
-    //Recieve KeyPress event when "F1" + alt is pressed
+    //Recieve KeyPress event when "r" + alt is pressed
     grabKey("R", Mod1Mask);
     XGrabButton(dpy, 1, Mod1Mask, root, True,
             ButtonPressMask|ButtonReleaseMask|PointerMotionMask, GrabModeAsync, GrabModeAsync, None, None);

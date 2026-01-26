@@ -27,7 +27,7 @@ Window clients[128];
 int nclients = 0;
 int nkeys = 0;
 
-
+//TODO -> Maybe just dump the whole arg thing and hard code if's into OnKeyPress
 //Dont forget, structs are in the header
 Key keys[] = {
     {XK_r, Mod1Mask, Tile, {0}},
@@ -65,6 +65,7 @@ void OnDestroyNotify(XDestroyWindowEvent* ev){
 
 void OnKeyPress(XKeyEvent* ev){
     nkeys = sizeof(keys) / sizeof(keys[0]);
+
     for(int i = 0; i < nkeys; i++){
         if(ev->keycode == XKeysymToKeycode(dpy, keys[i].keysym)
                 && (ev->state & keys[i].mod)){
@@ -76,16 +77,7 @@ void OnKeyPress(XKeyEvent* ev){
 //Tile for keypress commands
 void Tile(const Arg *arg){
     (void)arg;
-    for(int i = 0; i < nclients; i++){
-        int h = sh;
-        int w = sw / nclients;
-
-        int x = w * i;
-        int y = 0;
-
-        XMoveResizeWindow(dpy, clients[i], x, y, w, h);
-        printf("Window %d: x%d, width%d\n", i, x, w);
-    }    
+    tile();    
 }
 
 //tile for logic and basic usage

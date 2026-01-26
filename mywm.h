@@ -3,16 +3,33 @@
 
 #include <X11/Xlib.h>
 
-void grabKey(char* key, unsigned int mod);
+typedef struct{
+    int i; 
+}Arg;
 
-void OnMapRequest(XMapRequestEvent* ev);
+typedef struct{
+    KeySym keysym;
+    unsigned int mod;
+    void (*func)(const Arg *arg);
+    Arg arg;
+} Key;
 
-void OnConfigureRequest(XConfigureRequestEvent* ev);
+void grab_key(KeySym keysym, unsigned int mod);
 
-void Tile();
+void OnMapRequest(XMapRequestEvent *ev);
+
+void OnConfigureRequest(XConfigureRequestEvent *ev);
+
+void tile();
+
+void Tile(const Arg *arg);
 
 void manage(Window w);
 
 void unmanage(Window w);
+
+void focus(Window w);
+
+void focus_direction(const Arg *arg);
 
 #endif

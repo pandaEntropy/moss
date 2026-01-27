@@ -32,4 +32,8 @@ void focus(Window w);
 
 void focus_direction(const Arg *arg);
 
+void rotate(const Arg *arg);
+
+void unmap(const Arg *arg);
+
 #endif

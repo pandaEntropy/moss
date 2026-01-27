@@ -18,21 +18,19 @@ Display* dpy;
 int sw; //screen width
 int sh; //screen height
 int screen;  
-XWindowAttributes attr;
-XButtonEvent start;
 XEvent ev;
 Window root;
 Window focused = None;
 Window clients[128];
 int nclients = 0;
 int nkeys = 0;
+bool subwin_unmapped = false;
 
-//TODO -> Maybe just dump the whole arg thing and hard code if's into OnKeyPress
-//Dont forget, structs are in the header
 Key keys[] = {
-    {XK_r, Mod1Mask, Tile, {0}},
+    {XK_r, Mod1Mask, rotate, {0}},
     {XK_l, Mod1Mask, focus_direction, {.i = 3}},
-    {XK_h, Mod1Mask, focus_direction, {.i = 1}}
+    {XK_h, Mod1Mask, focus_direction, {.i = 1}},
+    {XK_d, Mod1Mask, unmap, {0}}
 };
 
 void grab_key(KeySym keysym, unsigned int mod){
@@ -90,7 +88,27 @@ for(int i = 0; i < nclients; i++){
         int y = 0;
 
         XMoveResizeWindow(dpy, clients[i], x, y, w, h);
-        printf("Window %d: x%d, width%d\n", i, x, w);
+    }
+}
+
+void rotate(const Arg *arg){
+    (void)arg;
+    if(nclients < 2) return;
+    
+    
+    XWindowAttributes first_attr;
+    XGetWindowAttributes(dpy, clients[0], &first_attr);
+
+    for(int i = 0; i < nclients; i++){
+        if(nclients-1 == i){
+            XMoveWindow(dpy, clients[i], first_attr.x, first_attr.y);
+            break;
+        }
+
+        XWindowAttributes next_attr;
+        XGetWindowAttributes(dpy, clients[i+1], &next_attr);
+
+        XMoveWindow(dpy, clients[i], next_attr.x, next_attr.y);
     }
 }
 
@@ -145,6 +163,20 @@ void focus_direction(const Arg *arg) {
         focus(best);
 }
 
+void unmap(const Arg *arg){
+    (void)arg;
+    if(nclients < 1) return;
+    
+    if(subwin_unmapped == false){
+        XUnmapSubwindows(dpy, root);
+        subwin_unmapped = true;
+    }
+    else{
+        XMapSubwindows(dpy, root);
+        subwin_unmapped = false;
+    }
+}
+
 
 void manage(Window w){
     clients[nclients] = w;
@@ -185,7 +217,8 @@ int main(void)
     sw = DisplayWidth(dpy, screen);
     sh = DisplayHeight(dpy, screen);
     root = DefaultRootWindow(dpy);
-
+    
+    //basically disables focus on hover
     XSetInputFocus(dpy, None, RevertToParent, CurrentTime);
 
     XSelectInput(dpy, root, SubstructureRedirectMask | 
@@ -197,6 +230,7 @@ int main(void)
     grab_key(XK_r, Mod1Mask);
     grab_key(XK_l, Mod1Mask);
     grab_key(XK_h, Mod1Mask);
+    grab_key(XK_d, Mod1Mask);
     XGrabButton(dpy, 1, None, root, True,
             ButtonPressMask|ButtonReleaseMask|PointerMotionMask, GrabModeAsync, GrabModeAsync, None, None);
     XGrabButton(dpy, 3, None, root, True,
@@ -207,11 +241,9 @@ int main(void)
     XDefineCursor(dpy, DefaultRootWindow(dpy), cursor);
 
     XSync(dpy, false);
-    start.subwindow = None;
     for(;;)
     {
         XNextEvent(dpy, &ev);
-        //printf("event: %d\n", ev.type);
         switch(ev.type){    
             case KeyPress:
                 OnKeyPress(&ev.xkey);
@@ -219,28 +251,8 @@ int main(void)
 
             case ButtonPress:
                 if(ev.xbutton.subwindow != None){
-                    //XGetWindowAttributes(dpy, ev.xbutton.subwindow, &attr);
-                    //start = ev.xbutton;
                     focus(ev.xbutton.subwindow);
                 }
-                break;
-
-            case MotionNotify:
-               /*
-                if(start.subwindow != None){
-                    int xdiff = ev.xbutton.x_root - start.x_root;
-                    int ydiff = ev.xbutton.y_root - start.y_root;
-                    XMoveResizeWindow(dpy, start.subwindow,
-                        attr.x + (start.button==1 ? xdiff : 0),
-                        attr.y + (start.button==1 ? ydiff : 0),
-                        MAX(1, attr.width + (start.button==3 ? xdiff : 0)),
-                        MAX(1, attr.height + (start.button==3 ? ydiff : 0)));
-                }
-                */
-                break;
-
-            case ButtonRelease:
-                start.subwindow = None;
                 break;
 
             case ConfigureRequest:

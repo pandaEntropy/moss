@@ -4,7 +4,8 @@
 #include <X11/Xlib.h>
 
 typedef struct{
-    int i; 
+    int i;
+    const char **cparr;
 }Arg;
 
 typedef struct{
@@ -35,5 +36,9 @@ void focus_direction(const Arg *arg);
 void rotate(const Arg *arg);
 
 void unmap(const Arg *arg);
+
+void kill_window(const Arg *arg);
+
+void spawn(const Arg *arg);
 
 #endif

@@ -6,8 +6,12 @@
 #include <X11/cursorfont.h>
 #include <stdio.h>
 #include <limits.h>
+#include <unistd.h>
 
-#define MAX(a, b) ((a) > (b) ? (a) : (b))
+/*
+TODO:
+1. Add different tiling modes
+*/
 
 #define DIR_LEFT 1
 #define DIR_DOWN 2
@@ -26,12 +30,15 @@ int nclients = 0;
 int nkeys = 0;
 bool subwin_unmapped = false;
 
+static const char *termcmd[] = {"xterm", NULL};
+
 Key keys[] = {
     {XK_r, Mod1Mask, rotate, {0}},
     {XK_l, Mod1Mask, focus_direction, {.i = 3}},
     {XK_h, Mod1Mask, focus_direction, {.i = 1}},
-    {XK_d, Mod1Mask, unmap, {0}}
-};
+    {XK_d, Mod1Mask, unmap, {0}},
+    {XK_k, Mod1Mask, kill_window, {0}},
+    {XK_Return, Mod1Mask, spawn, {.cparr = termcmd}}};
 
 void grab_key(KeySym keysym, unsigned int mod){
     KeyCode code = XKeysymToKeycode(dpy, keysym);
@@ -112,6 +119,17 @@ void rotate(const Arg *arg){
     }
 }
 
+void spawn(const Arg *arg){
+    if(fork() == 0){
+        setsid(); // Create a new session for the child
+        execvp(arg->cparr[0], (char *const *)arg->cparr);
+        
+        //If child fails
+        perror("execvp failed");
+        _exit(1); // A safe way to terminate the forked child
+    }
+}
+
 void focus_direction(const Arg *arg) {
     int dir = arg->i;
     if (!focused) return;
@@ -177,6 +195,38 @@ void unmap(const Arg *arg){
     }
 }
 
+void kill_window(const Arg *arg){
+    (void)arg;
+    if(focused == None) return;
+    
+    Atom *protocols;
+    int n; //Number of protocols the client has
+    Atom wm_delete = XInternAtom(dpy, "WM_DELETE_WINDOW", false);
+    Atom wm_protocols = XInternAtom(dpy, "WM_PROTOCOLS", false);
+
+    if(XGetWMProtocols(dpy, focused, &protocols, &n)){
+        for(int i = 0; i < n; i++){
+            if(protocols[i] == wm_delete){
+                XEvent ev = {0};
+                ev.type = ClientMessage;
+                ev.xclient.window = focused;
+                ev.xclient.message_type = wm_protocols;
+                ev.xclient.format = 32;
+                // l type because format is 32 bits
+                ev.xclient.data.l[0] = wm_delete;
+                ev.xclient.data.l[1] = CurrentTime;
+
+                XSendEvent(dpy, focused, False, NoEventMask, &ev);
+                XFree(protocols);
+                return;
+            }
+        }
+        XFree(protocols);
+    }
+    //If client is not ICCCM compliant
+    XKillClient(dpy, focused);
+}
+
 
 void manage(Window w){
     clients[nclients] = w;
@@ -231,6 +281,8 @@ int main(void)
     grab_key(XK_l, Mod1Mask);
     grab_key(XK_h, Mod1Mask);
     grab_key(XK_d, Mod1Mask);
+    grab_key(XK_k, Mod1Mask);
+    grab_key(XK_Return, Mod1Mask);
     XGrabButton(dpy, 1, None, root, True,
             ButtonPressMask|ButtonReleaseMask|PointerMotionMask, GrabModeAsync, GrabModeAsync, None, None);
     XGrabButton(dpy, 3, None, root, True,

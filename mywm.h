@@ -15,15 +15,24 @@ typedef struct{
     Arg arg;
 } Key;
 
+typedef enum{
+    MASTER_LEFT,
+    MASTER_TOP,
+    MASTER_RIGHT,
+    MASTER_BOTTOM
+} MasterPosition;
+
 void grab_key(KeySym keysym, unsigned int mod);
 
 void OnMapRequest(XMapRequestEvent *ev);
 
 void OnConfigureRequest(XConfigureRequestEvent *ev);
 
-void tile();
+void horizontal_tile();
 
-void Tile(const Arg *arg);
+void tile(int mode);
+
+void master_tile();
 
 void manage(Window w);
 
@@ -40,5 +49,9 @@ void unmap(const Arg *arg);
 void kill_window(const Arg *arg);
 
 void spawn(const Arg *arg);
+
+void master_rotate();
+
+void horizontal_rotate();
 
 #endif

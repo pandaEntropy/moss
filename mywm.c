@@ -1,6 +1,5 @@
 #include "mywm.h"
 #include <X11/Xlib.h>
-#include <X11/X.h>
 #include <X11/keysym.h>
 #include <stdbool.h>
 #include <X11/cursorfont.h>
@@ -10,13 +9,19 @@
 
 /*
 TODO:
-1. Add different tiling modes
+1. Add master switching
 */
 
 #define DIR_LEFT 1
 #define DIR_DOWN 2
 #define DIR_RIGHT 3
 #define DIR_UP 4
+
+#define HORIZONTAL 1
+#define MASTER 2
+
+int tile_mode = MASTER;
+static MasterPosition master_pos = MASTER_LEFT;
 
 Display* dpy;
 int sw; //screen width
@@ -25,17 +30,21 @@ int screen;
 XEvent ev;
 Window root;
 Window focused = None;
+Window master = None;
+float mfactor = 0.5;
+int nmaster = 1;
+bool master_stack = true;
+bool horizontal_mode = false;
 Window clients[128];
 int nclients = 0;
-int nkeys = 0;
 bool subwin_unmapped = false;
 
 static const char *termcmd[] = {"xterm", NULL};
 
 Key keys[] = {
-    {XK_r, Mod1Mask, rotate, {0}},
-    {XK_l, Mod1Mask, focus_direction, {.i = 3}},
-    {XK_h, Mod1Mask, focus_direction, {.i = 1}},
+    {XK_r, Mod1Mask, rotate, {.i = MASTER}},
+    {XK_l, Mod1Mask, focus_direction, {.i = DIR_RIGHT}},
+    {XK_h, Mod1Mask, focus_direction, {.i = DIR_LEFT}},
     {XK_d, Mod1Mask, unmap, {0}},
     {XK_k, Mod1Mask, kill_window, {0}},
     {XK_Return, Mod1Mask, spawn, {.cparr = termcmd}}};
@@ -64,12 +73,12 @@ void OnConfigureRequest(XConfigureRequestEvent* ev){
     XConfigureWindow(dpy, ev->window, ev->value_mask, &changes);
 }
 
-void OnDestroyNotify(XDestroyWindowEvent* ev){
+void OnDestroyNotify(XDestroyWindowEvent *ev){
     unmanage(ev->window);        
 }
 
-void OnKeyPress(XKeyEvent* ev){
-    nkeys = sizeof(keys) / sizeof(keys[0]);
+void OnKeyPress(XKeyEvent *ev){
+    int nkeys = sizeof(keys) / sizeof(keys[0]);
 
     for(int i = 0; i < nkeys; i++){
         if(ev->keycode == XKeysymToKeycode(dpy, keys[i].keysym)
@@ -79,15 +88,19 @@ void OnKeyPress(XKeyEvent* ev){
     }
 }
 
-//Tile for keypress commands
-void Tile(const Arg *arg){
-    (void)arg;
-    tile();    
+void tile(int mode){
+    switch(mode){
+        case HORIZONTAL:
+            horizontal_tile();
+            break;
+        case MASTER:
+            master_tile();
+            break;
+    }
 }
 
-//tile for logic and basic usage
-void tile(){
-for(int i = 0; i < nclients; i++){
+void horizontal_tile(){
+    for(int i = 0; i < nclients; i++){
         int h = sh;
         int w = sw / nclients;
 
@@ -98,25 +111,117 @@ for(int i = 0; i < nclients; i++){
     }
 }
 
+void master_tile(){
+    if(nclients == 0) return;
+
+    if(nclients <= nmaster){
+        XMoveResizeWindow(dpy, master, 0, 0, sw, sh);
+        return;
+    }
+
+    int mw, mh, mx, my;
+    int ww, wh, wx, wy;
+
+    switch(master_pos){
+        case MASTER_TOP:
+            mw = sw;
+            mh = sh * mfactor;
+            mx = 0;
+            my = 0;
+
+            ww = sw / (nclients - nmaster);
+            wh = sh - mh;
+            wx = 0;
+            wy = mh;
+            break;
+
+        case MASTER_RIGHT:
+            mw = sw * mfactor;
+            mh = sh;
+            mx = sw - mw;
+            my = 0;
+
+            ww = sw - mw;
+            wh = sh / (nclients - nmaster);
+            wx = 0;
+            wy = 0;
+            break;
+
+        case MASTER_BOTTOM:
+            mw = sw;
+            mh = sh * mfactor;
+            mx = 0;
+            my = sh - mh;
+
+            ww = sw / (nclients - nmaster);
+            wh = sh - mh;
+            wx = 0;
+            wy = 0;
+            break;
+
+        case MASTER_LEFT:
+            mw = sw * mfactor;
+            mh = sh;
+            mx = 0;
+            my = 0;
+
+            ww = sw - mw;
+            wh = sh / (nclients - nmaster);
+            wx = mw;
+            wy = 0;
+            break;
+    }
+
+    XMoveResizeWindow(dpy, master, mx, my, mw, mh);
+
+    for(int i = 0; i < nclients; i++){
+        if(clients[i] == master) continue;
+
+        XMoveResizeWindow(dpy, clients[i], wx, wy, ww, wh);
+        if(master_pos == MASTER_TOP || master_pos == MASTER_BOTTOM)
+            wx += ww;
+        else
+            wy += wh;
+    }
+}
+
 void rotate(const Arg *arg){
-    (void)arg;
     if(nclients < 2) return;
-    
-    
+
+    int mode = arg->i;
+
+    switch(mode){
+        case HORIZONTAL:
+            horizontal_rotate();
+            break;
+
+        case MASTER:
+            master_rotate();
+            break;
+    }
+}
+
+void horizontal_rotate(){
     XWindowAttributes first_attr;
     XGetWindowAttributes(dpy, clients[0], &first_attr);
 
     for(int i = 0; i < nclients; i++){
         if(nclients-1 == i){
             XMoveWindow(dpy, clients[i], first_attr.x, first_attr.y);
-            break;
+            break;  
         }
 
         XWindowAttributes next_attr;
         XGetWindowAttributes(dpy, clients[i+1], &next_attr);
 
-        XMoveWindow(dpy, clients[i], next_attr.x, next_attr.y);
+        XMoveWindow(dpy, clients[i], next_attr.x, next_attr.y);  
     }
+}
+
+void master_rotate(){
+    //Cycle the enum
+    master_pos = (master_pos+1) % 4;
+    tile(tile_mode);
 }
 
 void spawn(const Arg *arg){
@@ -231,16 +336,15 @@ void kill_window(const Arg *arg){
 void manage(Window w){
     clients[nclients] = w;
     nclients++;        
-    tile();
     focus(w);
+    if(nclients == 1) 
+        master = w;
+    tile(tile_mode);
 }
 
 void unmanage(Window w){
     for(int i = 0; i < nclients; i++){
         if(clients[i] == w){
-            if(nclients > 1) focus(clients[i-1]);
-            else focus(root);
-
             for(int j = i; j < nclients-1; j++){
                 clients[j] = clients[j+1];    
             }
@@ -248,7 +352,20 @@ void unmanage(Window w){
             break;
         }
     }
-    tile();
+
+    if (master == w) {
+        if (nclients > 0)
+            master = clients[0];
+        else
+            master = None;
+    }
+
+    if (nclients > 0)
+        focus(master);
+    else
+        focus(root);
+
+    tile(tile_mode);
 }
 
 void focus(Window w){

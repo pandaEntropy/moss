@@ -17,9 +17,9 @@ typedef struct{
 
 typedef enum{
     MASTER_LEFT,
-    MASTER_TOP,
+    MASTER_BOTTOM,
     MASTER_RIGHT,
-    MASTER_BOTTOM
+    MASTER_TOP
 } MasterPosition;
 
 void grab_key(KeySym keysym, unsigned int mod);
@@ -53,5 +53,7 @@ void spawn(const Arg *arg);
 void master_rotate();
 
 void horizontal_rotate();
+
+void resize(const Arg *arg);
 
 #endif

@@ -47,11 +47,15 @@ Key keys[] = {
     {XK_h, Mod1Mask, focus_direction, {.i = DIR_LEFT}},
     {XK_d, Mod1Mask, unmap, {0}},
     {XK_k, Mod1Mask, kill_window, {0}},
-    {XK_Return, Mod1Mask, spawn, {.cparr = termcmd}}};
+    {XK_Return, Mod1Mask, spawn, {.cparr = termcmd}},
+    {XK_l, Mod1Mask | ControlMask, resize, {.i = DIR_RIGHT}},
+    {XK_h, Mod1Mask | ControlMask, resize, {.i = DIR_LEFT}},
+    {XK_k, Mod1Mask | ControlMask, resize, {.i = DIR_UP}},
+    {XK_j, Mod1Mask | ControlMask, resize, {.i = DIR_DOWN}}};
 
 void grab_key(KeySym keysym, unsigned int mod){
     KeyCode code = XKeysymToKeycode(dpy, keysym);
-    XGrabKey(dpy, code, mod, DefaultRootWindow(dpy), false, GrabModeAsync, GrabModeAsync);
+    XGrabKey(dpy, code, mod, DefaultRootWindow(dpy), False, GrabModeAsync, GrabModeAsync);
 }
 
 void OnMapRequest(XMapRequestEvent* ev){
@@ -81,10 +85,10 @@ void OnKeyPress(XKeyEvent *ev){
     int nkeys = sizeof(keys) / sizeof(keys[0]);
 
     for(int i = 0; i < nkeys; i++){
-        if(ev->keycode == XKeysymToKeycode(dpy, keys[i].keysym)
-                && (ev->state & keys[i].mod)){
+        if(ev->keycode == XKeysymToKeycode(dpy, keys[i].keysym) && ev->state == keys[i].mod){
             keys[i].func(&keys[i].arg);
-        }                
+            return;
+        }
     }
 }
 
@@ -183,6 +187,41 @@ void master_tile(){
         else
             wy += wh;
     }
+}
+
+void resize(const Arg *arg){
+    int dir = arg->i;
+    float change = 0;
+    
+    if(nclients < 2)
+        return;
+
+    switch(master_pos){
+        case MASTER_LEFT:
+            if(dir == DIR_LEFT) change = -0.05;
+            if(dir == DIR_RIGHT) change = 0.05;
+            break;
+        
+        case MASTER_RIGHT:
+            if(dir == DIR_LEFT) change = 0.05;
+            if(dir == DIR_RIGHT) change = -0.05;
+            break;
+
+        case MASTER_TOP:
+            if(dir == DIR_UP) change = -0.05;
+            if(dir == DIR_DOWN) change = 0.05;
+            break;
+
+        case MASTER_BOTTOM:
+            if(dir == DIR_UP) change = 0.05;
+            if(dir == DIR_DOWN) change = -0.05;
+            break;
+    }
+    if(mfactor + change > 1 || mfactor + change < 0)
+        return;
+    
+    mfactor += change;
+    tile(tile_mode);
 }
 
 void rotate(const Arg *arg){
@@ -400,6 +439,13 @@ int main(void)
     grab_key(XK_d, Mod1Mask);
     grab_key(XK_k, Mod1Mask);
     grab_key(XK_Return, Mod1Mask);
+    
+    //resize keys
+    grab_key(XK_h, Mod1Mask | ControlMask);
+    grab_key(XK_l, Mod1Mask | ControlMask);
+    grab_key(XK_k, Mod1Mask | ControlMask);
+    grab_key(XK_j, Mod1Mask | ControlMask);
+
     XGrabButton(dpy, 1, None, root, True,
             ButtonPressMask|ButtonReleaseMask|PointerMotionMask, GrabModeAsync, GrabModeAsync, None, None);
     XGrabButton(dpy, 3, None, root, True,

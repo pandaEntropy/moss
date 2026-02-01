@@ -6,10 +6,9 @@
 #include <stdio.h>
 #include <limits.h>
 #include <unistd.h>
-
+#include <stdlib.h>
 /*
 TODO:
-1. Add master switching
 */
 
 #define DIR_LEFT 1
@@ -43,15 +42,18 @@ static const char *termcmd[] = {"xterm", NULL};
 
 Key keys[] = {
     {XK_r, Mod1Mask, rotate, {.i = MASTER}},
+    {XK_j, Mod1Mask, focus_direction, {.i = DIR_DOWN}},
+    {XK_k, Mod1Mask, focus_direction, {.i = DIR_UP}},
     {XK_l, Mod1Mask, focus_direction, {.i = DIR_RIGHT}},
     {XK_h, Mod1Mask, focus_direction, {.i = DIR_LEFT}},
     {XK_d, Mod1Mask, unmap, {0}},
-    {XK_k, Mod1Mask, kill_window, {0}},
+    {XK_x, Mod1Mask, kill_window, {0}},
     {XK_Return, Mod1Mask, spawn, {.cparr = termcmd}},
     {XK_l, Mod1Mask | ControlMask, resize, {.i = DIR_RIGHT}},
     {XK_h, Mod1Mask | ControlMask, resize, {.i = DIR_LEFT}},
     {XK_k, Mod1Mask | ControlMask, resize, {.i = DIR_UP}},
-    {XK_j, Mod1Mask | ControlMask, resize, {.i = DIR_DOWN}}};
+    {XK_j, Mod1Mask | ControlMask, resize, {.i = DIR_DOWN}},
+    {XK_Return, Mod1Mask | ControlMask, set_master, {0}}};
 
 void grab_key(KeySym keysym, unsigned int mod){
     KeyCode code = XKeysymToKeycode(dpy, keysym);
@@ -195,7 +197,6 @@ void resize(const Arg *arg){
     
     if(nclients < 2)
         return;
-
     switch(master_pos){
         case MASTER_LEFT:
             if(dir == DIR_LEFT) change = -0.05;
@@ -279,7 +280,7 @@ void focus_direction(const Arg *arg) {
     if (!focused) return;
 
     Window best = None;
-    int best_dist = INT_MAX;
+    int bestdist = INT_MAX;
 
     XWindowAttributes fa;
     XGetWindowAttributes(dpy, focused, &fa);
@@ -306,18 +307,30 @@ void focus_direction(const Arg *arg) {
         bool valid = false;
         int dist = 0;
 
-        //evaluate each calculated distance based on direction
+        //evaluate each calculated distance based on direction and penalize offset on the unfocused direction
         switch (dir) {
-            case DIR_LEFT:  valid = dx < 0; dist = -dx; break;
-            case DIR_RIGHT: valid = dx > 0; dist = dx; break;
-            case DIR_UP:    valid = dy < 0; dist = -dy; break;
-            case DIR_DOWN:  valid = dy > 0; dist = dy; break;
+            case DIR_LEFT:  
+                valid = dx < 0; 
+                dist = -dx + abs(dy); 
+                break;
+            case DIR_RIGHT: 
+                valid = dx > 0; 
+                dist = dx + abs(dy); 
+                break;
+            case DIR_UP:    
+                valid = dy < 0; 
+                dist = -dy + abs(dx); 
+                break;
+            case DIR_DOWN:  
+                valid = dy > 0; 
+                dist = dy + abs(dx); 
+                break;
         }
 
         //get the records
-        if (valid && dist < best_dist) {
+        if (valid && dist < bestdist) {
             best = w;
-            best_dist = dist;
+            bestdist = dist;
         }
     }
 
@@ -411,6 +424,13 @@ void focus(Window w){
     focused = w;
     XSetInputFocus(dpy, w, RevertToParent, CurrentTime);
 }
+
+void set_master(const Arg *arg){
+    (void)arg;
+    if(!focused) return;
+    master = focused;
+    tile(tile_mode);
+}
  
 
 
@@ -434,11 +454,17 @@ int main(void)
             FocusChangeMask);
     
     grab_key(XK_r, Mod1Mask);
+
     grab_key(XK_l, Mod1Mask);
     grab_key(XK_h, Mod1Mask);
-    grab_key(XK_d, Mod1Mask);
+    grab_key(XK_j, Mod1Mask);
     grab_key(XK_k, Mod1Mask);
+    
+    grab_key(XK_d, Mod1Mask);
+    grab_key(XK_x, Mod1Mask);
     grab_key(XK_Return, Mod1Mask);
+
+    grab_key(XK_Return, Mod1Mask | ControlMask);
     
     //resize keys
     grab_key(XK_h, Mod1Mask | ControlMask);

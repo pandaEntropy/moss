@@ -56,4 +56,6 @@ void horizontal_rotate();
 
 void resize(const Arg *arg);
 
+void set_master(const Arg *arg);
+
 #endif

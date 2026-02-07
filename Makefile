@@ -1,4 +1,16 @@
-all: build
+CC = gcc
+CFLAGS = -Wall -Wextra -std=c17
+LDFLAGS = -lX11
 
-build:
-	gcc mywm.c -o mywm -Wall -Wextra -std=c17 -lX11
+SRC = \
+	src/main.c \
+	src/wm.c \
+	src/layout.c
+
+OBJ = $(SRC:.c=.o)
+
+build: $(OBJ)
+	$(CC) $(OBJ) -o main $(LDFLAGS)
+
+src/%.o: src/%.c
+	$(CC) $(CFLAGS) -c $< -o $@

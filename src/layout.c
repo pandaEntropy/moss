@@ -136,7 +136,7 @@ void resize(const Arg *arg){
         return;
     
     mfactor += change;
-    tile(tile_mode);
+    tile();
 }
 
 void rotate(const Arg *arg){
@@ -175,6 +175,6 @@ void horizontal_rotate(){
 void master_rotate(){
     //Cycle the enum
     master_pos = (master_pos+1) % 4;
-    tile(tile_mode);
+    tile();
 }
 

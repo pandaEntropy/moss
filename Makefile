@@ -9,6 +9,8 @@ SRC = \
 
 OBJ = $(SRC:.c=.o)
 
+all: build
+
 build: $(OBJ)
 	$(CC) $(OBJ) -o main $(LDFLAGS)
 

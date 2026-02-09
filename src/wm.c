@@ -27,7 +27,7 @@ int nclients = 0;
 
 bool subwin_unmapped = false;
 
-static const char *termcmd[] = {"xterm", NULL};
+static const char *termcmd[] = {"xterm", NULL}; //remove this from here
 
 Key keys[] = {
     {XK_r, Mod1Mask, rotate, {.i = LAYOUT_MASTER}},

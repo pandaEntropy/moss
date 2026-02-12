@@ -1,4 +1,6 @@
 #include "wm.h"
+#include "keys.h"
+
 #include <X11/Xlib.h>
 #include <X11/keysym.h>
 #include <X11/cursorfont.h>
@@ -22,25 +24,8 @@ int main(void)
             EnterWindowMask |
             LeaveWindowMask |
             FocusChangeMask);
-    
-    grab_key(XK_r, Mod1Mask);
 
-    grab_key(XK_l, Mod1Mask);
-    grab_key(XK_h, Mod1Mask);
-    grab_key(XK_j, Mod1Mask);
-    grab_key(XK_k, Mod1Mask);
-    
-    grab_key(XK_d, Mod1Mask);
-    grab_key(XK_x, Mod1Mask);
-    grab_key(XK_Return, Mod1Mask);
-
-    grab_key(XK_Return, Mod1Mask | ControlMask);
-    
-    //resize keys
-    grab_key(XK_h, Mod1Mask | ControlMask);
-    grab_key(XK_l, Mod1Mask | ControlMask);
-    grab_key(XK_k, Mod1Mask | ControlMask);
-    grab_key(XK_j, Mod1Mask | ControlMask);
+    key_setup(); //grabs all the necessary keys
 
     XGrabButton(dpy, 1, None, root, True,
             ButtonPressMask|ButtonReleaseMask|PointerMotionMask, GrabModeAsync, GrabModeAsync, None, None);

@@ -1,18 +1,23 @@
-CC = gcc
-CFLAGS = -Wall -Wextra -std=c17 -Iinclude
-LDFLAGS = -lX11
+BINARY=main
+CODEDIRS=src
+INCDIRS=include
 
-SRC = \
-	src/main.c \
-	src/wm.c \
-	src/layout.c
+CC=gcc
 
-OBJ = $(SRC:.c=.o)
+# add -I to each include directory
+CFLAGS=-Wall -Wextra $(foreach D,$(INCDIRS),-I$(D))
+LDFLAGS=-lX11
 
-all: build
+CFILES=$(foreach D,$(CODEDIRS),$(wildcard $(D)/*.c))
+OBJECTS=$(patsubst %.c,%.o,$(CFILES))
 
-build: $(OBJ)
-	$(CC) $(OBJ) -o main $(LDFLAGS)
+all: $(BINARY)
 
-src/%.o: src/%.c
-	$(CC) $(CFLAGS) -c $< -o $@
+$(BINARY): $(OBJECTS)
+	$(CC) -o $@ $^ $(LDFLAGS)
+
+%.o:%.c
+	$(CC) $(CFLAGS) -c -o $@ $<
+
+clean:
+	rm -rf $(BINARY) $(OBJECTS)

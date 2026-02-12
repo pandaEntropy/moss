@@ -1,7 +1,9 @@
 #include "wm.h"
 #include "commands.h"
+#include "layout.h"
 
 #include <string.h>
+#include <stdio.h>
 
 typedef struct{
     char *name;
@@ -9,7 +11,7 @@ typedef struct{
     Arg arg;
 }Command;
 
-static const char *termcmd[] = {"xterm", NULL};
+const char *termcmd[] = {"xterm", NULL};
 
 Command commands[] = {
     {"focus_right", focus_direction, {.i = DIR_RIGHT}},
@@ -18,15 +20,19 @@ Command commands[] = {
     {"focus_up", focus_direction, {.i = DIR_UP}},
     {"kill", kill_window, {0}},
     {"spawn", spawn, {.cparr = termcmd}},
-    {"set_master", set_master, {0}}
+    {"set_master", set_master, {0}},
+    {"rotate", rotate, {.i = LAYOUT_MASTER}},
+    {"unmap", unmap, {0}},
+    {"resize_right", resize, {.i = DIR_RIGHT}},
+    {"resize_left", resize, {.i = DIR_LEFT}},
+    {"resize_up", resize, {.i = DIR_UP}},
+    {"resize_down", resize, {.i = DIR_DOWN}}
 };
 
-CmdResult dispatch_command(const char *cmd){
-    for(int i = 0; i < (sizeof(commands) / sizeof(Command)); i++){
+void dispatch_command(const char *cmd){
+    for(size_t i = 0; i < (sizeof(commands) / sizeof(Command)); i++){
         if(strcmp(commands[i].name, cmd) == 0){
             commands[i].func(&commands[i].arg);
-            return CMD_OK;
         }
     }
-    return CMD_BADARG;
 }

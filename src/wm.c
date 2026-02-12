@@ -1,5 +1,6 @@
 #include "wm.h"
 #include "layout.h"
+#include "keys.h"
 
 #include <X11/Xlib.h>
 #include <X11/keysym.h>
@@ -9,9 +10,7 @@
 #include <limits.h>
 #include <unistd.h>
 #include <stdlib.h>
-/*
-TODO:
-*/
+
 
 
 Display* dpy;
@@ -27,27 +26,6 @@ int nclients = 0;
 
 bool subwin_unmapped = false;
 
-static const char *termcmd[] = {"xterm", NULL}; //remove this from here
-
-Key keys[] = {
-    {XK_r, Mod1Mask, rotate, {.i = LAYOUT_MASTER}},
-    {XK_j, Mod1Mask, focus_direction, {.i = DIR_DOWN}},
-    {XK_k, Mod1Mask, focus_direction, {.i = DIR_UP}},
-    {XK_l, Mod1Mask, focus_direction, {.i = DIR_RIGHT}},
-    {XK_h, Mod1Mask, focus_direction, {.i = DIR_LEFT}},
-    {XK_d, Mod1Mask, unmap, {0}},
-    {XK_x, Mod1Mask, kill_window, {0}},
-    {XK_Return, Mod1Mask, spawn, {.cparr = termcmd}},
-    {XK_l, Mod1Mask | ControlMask, resize, {.i = DIR_RIGHT}},
-    {XK_h, Mod1Mask | ControlMask, resize, {.i = DIR_LEFT}},
-    {XK_k, Mod1Mask | ControlMask, resize, {.i = DIR_UP}},
-    {XK_j, Mod1Mask | ControlMask, resize, {.i = DIR_DOWN}},
-    {XK_Return, Mod1Mask | ControlMask, set_master, {0}}};
-
-void grab_key(KeySym keysym, unsigned int mod){
-    KeyCode code = XKeysymToKeycode(dpy, keysym);
-    XGrabKey(dpy, code, mod, DefaultRootWindow(dpy), False, GrabModeAsync, GrabModeAsync);
-}
 
 void OnMapRequest(XMapRequestEvent* ev){
     XMapWindow(dpy, ev->window);
@@ -73,14 +51,7 @@ void OnDestroyNotify(XDestroyWindowEvent *ev){
 }
 
 void OnKeyPress(XKeyEvent *ev){
-    int nkeys = sizeof(keys) / sizeof(keys[0]);
-
-    for(int i = 0; i < nkeys; i++){
-        if(ev->keycode == XKeysymToKeycode(dpy, keys[i].keysym) && ev->state == keys[i].mod){
-            keys[i].func(&keys[i].arg);
-            return;
-        }
-    }
+    handle_keypress(ev);
 }
 
 void spawn(const Arg *arg){
@@ -273,9 +244,4 @@ Client* wintoclient(Window w){
     }
     return NULL;
 }
- 
-
-
-
-
 

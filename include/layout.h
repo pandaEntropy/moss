@@ -3,6 +3,18 @@
 
 #include "wm.h"
 
+typedef enum{
+    MASTER_LEFT,
+    MASTER_TOP,
+    MASTER_RIGHT,
+    MASTER_BOTTOM
+} MasterPosition;
+
+typedef enum{
+    LAYOUT_MASTER,
+    LAYOUT_HORIZONTAL
+}LayoutMode;
+
 void horizontal_tile();
 
 void tile();

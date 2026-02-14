@@ -1,9 +1,10 @@
+#include <string.h>
+#include <stdio.h>
+#include <unistd.h>
+
 #include "wm.h"
 #include "commands.h"
 #include "layout.h"
-
-#include <string.h>
-#include <stdio.h>
 
 typedef struct{
     char *name;
@@ -12,6 +13,17 @@ typedef struct{
 }Command;
 
 const char *termcmd[] = {"xterm", NULL};
+
+void spawn(const Arg *arg){
+    if(fork() == 0){
+        setsid(); // Create a new session for the child
+        execvp(arg->cparr[0], (char *const *)arg->cparr);
+
+        //If child fails
+        perror("execvp failed");
+        _exit(1); // A safe way to terminate the forked child
+    }
+}
 
 Command commands[] = {
     {"focus_right", focus_direction, {.i = DIR_RIGHT}},
@@ -33,6 +45,7 @@ void dispatch_command(const char *cmd){
     for(size_t i = 0; i < (sizeof(commands) / sizeof(Command)); i++){
         if(strcmp(commands[i].name, cmd) == 0){
             commands[i].func(&commands[i].arg);
+            return;
         }
     }
 }

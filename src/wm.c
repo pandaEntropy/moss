@@ -12,7 +12,6 @@
 #include <stdlib.h>
 
 
-
 Display* dpy;
 int sw; //screen width
 int sh; //screen height
@@ -54,14 +53,29 @@ void OnKeyPress(XKeyEvent *ev){
     handle_keypress(ev);
 }
 
-void spawn(const Arg *arg){
-    if(fork() == 0){
-        setsid(); // Create a new session for the child
-        execvp(arg->cparr[0], (char *const *)arg->cparr);
-        
-        //If child fails
-        perror("execvp failed");
-        _exit(1); // A safe way to terminate the forked child
+void handle_XEvent(XEvent *ev){
+    switch(ev->type){    
+        case KeyPress:
+            OnKeyPress(&ev->xkey);
+            break;
+
+        case ButtonPress:
+            if(ev->xbutton.subwindow != None){
+                focus(wintoclient(ev->xbutton.subwindow));
+            }
+            break;
+
+        case ConfigureRequest:
+            OnConfigureRequest(&ev->xconfigurerequest);
+            break;
+
+        case MapRequest:
+            OnMapRequest(&ev->xmaprequest);
+            break;
+
+        case DestroyNotify:
+            OnDestroyNotify(&ev->xdestroywindow);
+            break;
     }
 }
 
@@ -131,7 +145,7 @@ void focus_direction(const Arg *arg) {
 void unmap(const Arg *arg){
     (void)arg;
     if(nclients < 1) return;
-    
+
     if(subwin_unmapped == false){
         XUnmapSubwindows(dpy, root);
         subwin_unmapped = true;
@@ -145,7 +159,7 @@ void unmap(const Arg *arg){
 void kill_window(const Arg *arg){
     (void)arg;
     if(focused == NULL) return;
-    
+
     Atom *protocols;
     int n; //Number of protocols the client has
     Atom wm_delete = XInternAtom(dpy, "WM_DELETE_WINDOW", false);

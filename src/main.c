@@ -1,14 +1,14 @@
-#include "wm.h"
-#include "keys.h"
-
 #include <X11/Xlib.h>
 #include <X11/keysym.h>
 #include <X11/cursorfont.h>
+#include <errno.h>
 
+#include "wm.h"
+#include "keys.h"
+#include "ipc.h"
 
 int main(void)
 {
-    XEvent ev;
     if(!(dpy = XOpenDisplay(0x0))) return 1;
     
     int screen = DefaultScreen(dpy);
@@ -37,31 +37,35 @@ int main(void)
     XDefineCursor(dpy, DefaultRootWindow(dpy), cursor);
 
     XSync(dpy, False);
-    for(;;)
-    {
-        XNextEvent(dpy, &ev);
-        switch(ev.type){    
-            case KeyPress:
-                OnKeyPress(&ev.xkey);
-                break;
 
-            case ButtonPress:
-                if(ev.xbutton.subwindow != None){
-                    focus(wintoclient(ev.xbutton.subwindow));
-                }
-                break;
+    ipc_init();
 
-            case ConfigureRequest:
-                OnConfigureRequest(&ev.xconfigurerequest);
-                break;    
+    int xfd = ConnectionNumber(dpy);
 
-            case MapRequest:
-                OnMapRequest(&ev.xmaprequest);
-                break;
+    for(;;){
+        fd_set fds;
+        FD_ZERO(&fds); //clear the bitmask
+        FD_SET(xfd, &fds); 
+        FD_SET(wmfd, &fds);
 
-            case DestroyNotify:
-                OnDestroyNotify(&ev.xdestroywindow);
-                break;
+        int maxfd = (xfd > wmfd ? xfd : wmfd) + 1;
+
+        if(select(maxfd, &fds, NULL, NULL, NULL) < 0){
+            if(errno == EINTR) continue;
+            break;
+        }
+
+        if(FD_ISSET(wmfd, &fds)){
+            ipc_handle();
+            XFlush(dpy);
+        }
+
+        if(FD_ISSET(xfd, &fds)){
+            while(XPending(dpy)){
+               XEvent ev;
+               XNextEvent(dpy, &ev);
+               handle_XEvent(&ev);
+            }
         }
     }
     XCloseDisplay(dpy);

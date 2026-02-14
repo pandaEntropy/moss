@@ -35,6 +35,8 @@ void OnKeyPress(XKeyEvent *ev);
 
 void OnDestroyNotify(XDestroyWindowEvent *ev);
 
+void handle_XEvent(XEvent *ev);
+
 void manage(Window w);
 
 void unmanage(Window w);
@@ -46,8 +48,6 @@ void focus_direction(const Arg *arg);
 void unmap(const Arg *arg);
 
 void kill_window(const Arg *arg);
-
-void spawn(const Arg *arg);
 
 void set_master(const Arg *arg);
 

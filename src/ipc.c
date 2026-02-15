@@ -53,11 +53,6 @@ void ipc_handle(){
         fcntl(client, F_SETFD, FD_CLOEXEC);
         ssize_t n = read(client, buf, sizeof(buf) - 1);
         if(n > 0){
-            buf[n] = '\0'; // Adds a null terminator after the last byte read
-
-            char *nl = strchr(buf, '\n');
-            if(nl) *nl = '\0'; 
-
             dispatch_command(buf);
             write(client, "ok\n", 3);
         }

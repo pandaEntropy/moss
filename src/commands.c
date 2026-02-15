@@ -48,4 +48,5 @@ void dispatch_command(const char *cmd){
             return;
         }
     }
+    fprintf(stderr, "WARN: Command not found");
 }

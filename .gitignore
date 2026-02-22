@@ -3,3 +3,4 @@ main
 .clangd
 wmctl
 wmctl.c
+bar

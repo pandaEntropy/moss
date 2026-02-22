@@ -1,6 +1,7 @@
 BINARY=main
 CODEDIRS=src
 INCDIRS=include
+BAR=bar/bar
 
 CC=gcc
 
@@ -11,7 +12,10 @@ LDFLAGS=-lX11
 CFILES=$(foreach D,$(CODEDIRS),$(wildcard $(D)/*.c))
 OBJECTS=$(patsubst %.c,%.o,$(CFILES))
 
-all: $(BINARY)
+all: $(BINARY) $(BAR)
+
+$(BAR): bar/bar.c
+	$(CC) $< -o $@ $(LDFLAGS)
 
 $(BINARY): $(OBJECTS)
 	$(CC) -o $@ $^ $(LDFLAGS)

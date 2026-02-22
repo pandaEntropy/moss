@@ -3,6 +3,7 @@
 #include "wm.h"
 
 #include <X11/keysym.h>
+#include <X11/Xlib.h>
 
 typedef struct{
     KeySym keysym;
@@ -26,21 +27,21 @@ Key keys[] = {
     {XK_Return, Mod1Mask | ControlMask, "set_master"}
 };
 
-void grab_key(KeySym keysym, unsigned int mod){
+void grab_key(Display *dpy, KeySym keysym, unsigned int mod){
     KeyCode code = XKeysymToKeycode(dpy, keysym);
     XGrabKey(dpy, code, mod, DefaultRootWindow(dpy), False, GrabModeAsync, GrabModeAsync);
 }
 
-void key_setup(){
+void key_setup(Display *dpy){
     for(size_t i = 0; i < (sizeof(keys) / sizeof(Key)); i++){
-        grab_key(keys[i].keysym, keys[i].mod);  
+        grab_key(dpy, keys[i].keysym, keys[i].mod);  
     }
 }
 
-void handle_keypress(XKeyEvent *ev){
+void handle_keypress(WM *wm, XKeyEvent *ev){
     for(size_t i = 0; i < (sizeof(keys) / sizeof(Key)); i++){
-        if(ev->keycode == XKeysymToKeycode(dpy, keys[i].keysym) && ev->state == keys[i].mod){
-            dispatch_command(keys[i].cmd);
+        if(ev->keycode == XKeysymToKeycode(wm->dpy, keys[i].keysym) && ev->state == keys[i].mod){
+            dispatch_command(wm, keys[i].cmd);
             return;
         }
     }

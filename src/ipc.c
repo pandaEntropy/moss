@@ -7,6 +7,7 @@
 #include <errno.h>
 
 #include "commands.h"
+#include "ipc.h" 
 
 #define IPC_PATH "/tmp/wm.sock"
 #define IPC_BUFSIZE 128
@@ -45,7 +46,7 @@ void ipc_init(){
     fcntl(wmfd, F_SETFD, FD_CLOEXEC);
 }
 
-void ipc_handle(){
+void ipc_handle(WM *wm){
     int client;
     char buf[IPC_BUFSIZE];
 
@@ -53,7 +54,7 @@ void ipc_handle(){
         fcntl(client, F_SETFD, FD_CLOEXEC);
         ssize_t n = read(client, buf, sizeof(buf) - 1);
         if(n > 0){
-            dispatch_command(buf);
+            dispatch_command(wm, buf);
             write(client, "ok\n", 3);
         }
         close(client);

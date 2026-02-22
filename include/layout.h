@@ -2,6 +2,7 @@
 #define LAYOUT_H
 
 #include "wm.h"
+#include "forward.h"
 
 typedef enum{
     MASTER_LEFT,
@@ -15,18 +16,18 @@ typedef enum{
     LAYOUT_HORIZONTAL
 }LayoutMode;
 
-void horizontal_tile();
+void horizontal_tile(WM *wm);
 
-void tile();
+void tile(WM *wm);
 
-void master_tile();
+void master_tile(WM *wm);
 
-void rotate(const Arg *arg);
+void rotate(WM *wm, const Arg *arg);
 
-void master_rotate();
+void master_rotate(WM *wm);
 
-void horizontal_rotate();
+void horizontal_rotate(WM *wm);
 
-void resize(const Arg *arg);
+void resize(WM *wm, const Arg *arg);
 
 #endif

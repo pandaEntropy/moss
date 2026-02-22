@@ -3,10 +3,12 @@
 
 #include <X11/Xlib.h>
 
-void grab_key(KeySym keysym, unsigned int mod);
+#include "forward.h"
 
-void key_setup();
+void grab_key(Display *dpy, KeySym keysym, unsigned int mod);
 
-void handle_keypress(XKeyEvent *ev);
+void key_setup(Display *dpy);
+
+void handle_keypress(WM *wm, XKeyEvent *ev);
 
 #endif

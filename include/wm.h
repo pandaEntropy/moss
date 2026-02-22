@@ -3,9 +3,19 @@
 
 #include <X11/Xlib.h>
 
+#include "forward.h"
+
 typedef struct{
     Window win;
 }Client;
+
+typedef struct{
+    Window win;
+    int left;
+    int right;
+    int top;
+    int bottom;
+}Dock;
 
 typedef struct{
     int i;
@@ -19,38 +29,58 @@ typedef enum{
     DIR_UP
 }Direction;
 
-extern Display *dpy;
-extern Window root;
-extern Client *focused;
-extern Client *master;
-extern Client clients[128];
-extern int nclients;
-extern int sw, sh;
+struct WM{
+    Display *dpy;
+    Window root;
+    int sw;
+    int sh;
 
-void OnMapRequest(XMapRequestEvent *ev);
+    Client *focused;
+    Client *master;
+    Client clients[128];
+    int nclients;
+    int usable_height;
+    int usable_width;
 
-void OnConfigureRequest(XConfigureRequestEvent *ev);
+    Atom net_win_type;
+    Atom net_win_type_dock;
+    Atom net_strut_partial;
 
-void OnKeyPress(XKeyEvent *ev);
+    Dock docks[16];
+    int ndocks;
+};
 
-void OnDestroyNotify(XDestroyWindowEvent *ev);
+void OnMapRequest(WM *wm, XMapRequestEvent *ev);
 
-void handle_XEvent(XEvent *ev);
+void OnConfigureRequest(WM *wm, XConfigureRequestEvent *ev);
 
-void manage(Window w);
+void OnKeyPress(WM *wm, XKeyEvent *ev);
 
-void unmanage(Window w);
+void OnDestroyNotify(WM *wm, XDestroyWindowEvent *ev);
 
-void focus(Client *c);
+void handle_XEvent(WM *wm, XEvent *ev);
 
-void focus_direction(const Arg *arg);
+void manage(WM *wm, Window w);
 
-void unmap(const Arg *arg);
+void unmanage(WM *wm, Window w);
 
-void kill_window(const Arg *arg);
+void focus(WM *wm, Client *c);
 
-void set_master(const Arg *arg);
+void focus_direction(WM *wm, const Arg *arg);
 
-Client* wintoclient(Window w);
+void unmap(WM *wm, const Arg *arg);
 
+void kill_window(WM *wm, const Arg *arg);
+
+void set_master(WM *wm, const Arg *arg);
+
+Client* wintoclient(WM *wm, Window w);
+
+int is_dock(WM *wm, Window win);
+
+int get_strut(WM *wm, Dock *dock);
+
+void recalc_usable_area(WM *wm);
+
+int unmanage_dock(WM *wm, Window win);
 #endif

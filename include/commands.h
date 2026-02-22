@@ -1,6 +1,8 @@
 #ifndef COMMANDS_H
 #define COMMANDS_H
 
-void dispatch_command(const char *cmd);
+#include "forward.h"
+
+void dispatch_command(WM *wm, const char *cmd);
 
 #endif

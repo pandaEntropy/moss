@@ -8,34 +8,34 @@ MasterPosition master_pos = MASTER_LEFT;
 float mfactor = 0.5;
 int nmaster = 1;
 
-void tile(){
+void tile(WM *wm){
     switch(tile_mode){
         case LAYOUT_HORIZONTAL:
-            horizontal_tile();
+            horizontal_tile(wm);
             break;
         case LAYOUT_MASTER:
-            master_tile();
+            master_tile(wm);
             break;
     }
 }
 
-void horizontal_tile(){
-    for(int i = 0; i < nclients; i++){
-        int h = sh;
-        int w = sw / nclients;
+void horizontal_tile(WM *wm){
+    for(int i = 0; i < wm->nclients; i++){
+        int h = wm->usable_height;
+        int w = wm->usable_width / wm->nclients;
 
         int x = w * i;
         int y = 0;
 
-        XMoveResizeWindow(dpy, clients[i].win, x, y, w, h);
+        XMoveResizeWindow(wm->dpy, wm->clients[i].win, x, y, w, h);
     }
 }
 
-void master_tile(){
-    if(nclients == 0 || !master) return;
+void master_tile(WM *wm){
+    if(wm->nclients == 0 || !wm->master) return;
 
-    if(nclients <= nmaster){
-        XMoveResizeWindow(dpy, master->win, 0, 0, sw, sh);
+    if(wm->nclients <= nmaster){
+        XMoveResizeWindow(wm->dpy, wm->master->win, 0, 0, wm->usable_width, wm->usable_height);
         return;
     }
 
@@ -44,60 +44,60 @@ void master_tile(){
 
     switch(master_pos){
         case MASTER_TOP:
-            mw = sw;
-            mh = sh * mfactor;
+            mw = wm->usable_width;
+            mh = wm->usable_height * mfactor;
             mx = 0;
             my = 0;
 
-            ww = sw / (nclients - nmaster);
-            wh = sh - mh;
+            ww = wm->usable_width / (wm->nclients - nmaster);
+            wh = wm->usable_height - mh;
             wx = 0;
             wy = mh;
             break;
 
         case MASTER_RIGHT:
-            mw = sw * mfactor;
-            mh = sh;
-            mx = sw - mw;
+            mw = wm->usable_width * mfactor;
+            mh = wm->usable_height;
+            mx = wm->usable_width - mw;
             my = 0;
 
-            ww = sw - mw;
-            wh = sh / (nclients - nmaster);
+            ww = wm->usable_width - mw;
+            wh = wm->usable_height / (wm->nclients - nmaster);
             wx = 0;
             wy = 0;
             break;
 
         case MASTER_BOTTOM:
-            mw = sw;
-            mh = sh * mfactor;
+            mw = wm->usable_width;
+            mh = wm->usable_height * mfactor;
             mx = 0;
-            my = sh - mh;
+            my = wm->usable_height - mh;
 
-            ww = sw / (nclients - nmaster);
-            wh = sh - mh;
+            ww = wm->usable_width / (wm->nclients - nmaster);
+            wh = wm->usable_height - mh;
             wx = 0;
             wy = 0;
             break;
 
         case MASTER_LEFT:
-            mw = sw * mfactor;
-            mh = sh;
+            mw = wm->usable_width * mfactor;
+            mh = wm->usable_height;
             mx = 0;
             my = 0;
 
-            ww = sw - mw;
-            wh = sh / (nclients - nmaster);
+            ww = wm->usable_width - mw;
+            wh = wm->usable_height / (wm->nclients - nmaster);
             wx = mw;
             wy = 0;
             break;
     }
 
-    XMoveResizeWindow(dpy, master->win, mx, my, mw, mh);
+    XMoveResizeWindow(wm->dpy, wm->master->win, mx, my, mw, mh);
 
-    for(int i = 0; i < nclients; i++){
-        if(clients[i].win == master->win) continue;
+    for(int i = 0; i < wm->nclients; i++){
+        if(wm->clients[i].win == wm->master->win) continue;
 
-        XMoveResizeWindow(dpy, clients[i].win, wx, wy, ww, wh);
+        XMoveResizeWindow(wm->dpy, wm->clients[i].win, wx, wy, ww, wh);
         if(master_pos == MASTER_TOP || master_pos == MASTER_BOTTOM)
             wx += ww;
         else
@@ -105,11 +105,11 @@ void master_tile(){
     }
 }
 
-void resize(const Arg *arg){
+void resize(WM *wm, const Arg *arg){
     int dir = arg->i;
     float change = 0;
     
-    if(nclients < 2)
+    if(wm->nclients < 2)
         return;
     switch(master_pos){
         case MASTER_LEFT:
@@ -136,45 +136,45 @@ void resize(const Arg *arg){
         return;
     
     mfactor += change;
-    tile();
+    tile(wm);
 }
 
-void rotate(const Arg *arg){
-    if(nclients < 2) return;
+void rotate(WM *wm, const Arg *arg){
+    if(wm->nclients < 2) return;
 
     int mode = arg->i;
 
     switch(mode){
         case LAYOUT_HORIZONTAL:
-            horizontal_rotate();
+            horizontal_rotate(wm);
             break;
 
         case LAYOUT_MASTER:
-            master_rotate();
+            master_rotate(wm);
             break;
     }
 }
 
-void horizontal_rotate(){
+void horizontal_rotate(WM *wm){
     XWindowAttributes first_attr;
-    XGetWindowAttributes(dpy, clients[0].win, &first_attr);
+    XGetWindowAttributes(wm->dpy, wm->clients[0].win, &first_attr);
 
-    for(int i = 0; i < nclients; i++){
-        if(nclients-1 == i){
-            XMoveWindow(dpy, clients[i].win, first_attr.x, first_attr.y);
+    for(int i = 0; i < wm->nclients; i++){
+        if(wm->nclients-1 == i){
+            XMoveWindow(wm->dpy, wm->clients[i].win, first_attr.x, first_attr.y);
             break;  
         }
 
         XWindowAttributes next_attr;
-        XGetWindowAttributes(dpy, clients[i+1].win, &next_attr);
+        XGetWindowAttributes(wm->dpy, wm->clients[i+1].win, &next_attr);
 
-        XMoveWindow(dpy, clients[i].win, next_attr.x, next_attr.y);  
+        XMoveWindow(wm->dpy, wm->clients[i].win, next_attr.x, next_attr.y);  
     }
 }
 
-void master_rotate(){
+void master_rotate(WM *wm){
     //Cycle the enum
     master_pos = (master_pos+1) % 4;
-    tile();
+    tile(wm);
 }
 

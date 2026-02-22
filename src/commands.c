@@ -8,13 +8,14 @@
 
 typedef struct{
     char *name;
-    void (*func)(const Arg *);
+    void (*func)(WM *wm, const Arg *);
     Arg arg;
 }Command;
 
 const char *termcmd[] = {"xterm", NULL};
 
-void spawn(const Arg *arg){
+void spawn(WM *wm, const Arg *arg){
+    (void)wm;
     if(fork() == 0){
         setsid(); // Create a new session for the child
         execvp(arg->cparr[0], (char *const *)arg->cparr);
@@ -41,10 +42,10 @@ Command commands[] = {
     {"resize_down", resize, {.i = DIR_DOWN}}
 };
 
-void dispatch_command(const char *cmd){
+void dispatch_command(WM *wm, const char *cmd){
     for(size_t i = 0; i < (sizeof(commands) / sizeof(Command)); i++){
         if(strcmp(commands[i].name, cmd) == 0){
-            commands[i].func(&commands[i].arg);
+            commands[i].func(wm, &commands[i].arg);
             return;
         }
     }

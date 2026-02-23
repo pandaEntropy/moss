@@ -20,14 +20,16 @@ void tile(WM *wm){
 }
 
 void horizontal_tile(WM *wm){
-    for(int i = 0; i < wm->nclients; i++){
+    int i = 0;
+    for(Client *c = wm->clients; c; c = c->next){
         int h = wm->usable_height;
         int w = wm->usable_width / wm->nclients;
 
         int x = w * i;
         int y = 0;
 
-        XMoveResizeWindow(wm->dpy, wm->clients[i].win, x, y, w, h);
+        XMoveResizeWindow(wm->dpy, c->win, x, y, w, h);
+        i++;
     }
 }
 
@@ -94,10 +96,10 @@ void master_tile(WM *wm){
 
     XMoveResizeWindow(wm->dpy, wm->master->win, mx, my, mw, mh);
 
-    for(int i = 0; i < wm->nclients; i++){
-        if(wm->clients[i].win == wm->master->win) continue;
+    for(Client *c = wm->clients; c; c = c->next){
+        if(c == wm->master) continue;
 
-        XMoveResizeWindow(wm->dpy, wm->clients[i].win, wx, wy, ww, wh);
+        XMoveResizeWindow(wm->dpy, c->win, wx, wy, ww, wh);
         if(master_pos == MASTER_TOP || master_pos == MASTER_BOTTOM)
             wx += ww;
         else
@@ -108,7 +110,7 @@ void master_tile(WM *wm){
 void resize(WM *wm, const Arg *arg){
     int dir = arg->i;
     float change = 0;
-    
+
     if(wm->nclients < 2)
         return;
     switch(master_pos){
@@ -116,7 +118,7 @@ void resize(WM *wm, const Arg *arg){
             if(dir == DIR_LEFT) change = -0.05;
             if(dir == DIR_RIGHT) change = 0.05;
             break;
-        
+
         case MASTER_RIGHT:
             if(dir == DIR_LEFT) change = 0.05;
             if(dir == DIR_RIGHT) change = -0.05;
@@ -132,9 +134,9 @@ void resize(WM *wm, const Arg *arg){
             if(dir == DIR_DOWN) change = -0.05;
             break;
     }
-    if(mfactor + change > 1 || mfactor + change < 0)
+    if(mfactor + change > 0.95 || mfactor + change < 0.05)
         return;
-    
+
     mfactor += change;
     tile(wm);
 }
@@ -156,19 +158,21 @@ void rotate(WM *wm, const Arg *arg){
 }
 
 void horizontal_rotate(WM *wm){
-    XWindowAttributes first_attr;
-    XGetWindowAttributes(wm->dpy, wm->clients[0].win, &first_attr);
+    if(!wm->clients) return;
 
-    for(int i = 0; i < wm->nclients; i++){
-        if(wm->nclients-1 == i){
-            XMoveWindow(wm->dpy, wm->clients[i].win, first_attr.x, first_attr.y);
+    XWindowAttributes first_attr;
+    XGetWindowAttributes(wm->dpy, wm->clients->win, &first_attr);
+
+    for(Client *c = wm->clients; c; c = c->next){
+        if(c->next == NULL){
+            XMoveWindow(wm->dpy, c->win, first_attr.x, first_attr.y);
             break;  
         }
 
         XWindowAttributes next_attr;
-        XGetWindowAttributes(wm->dpy, wm->clients[i+1].win, &next_attr);
+        XGetWindowAttributes(wm->dpy, c->next->win, &next_attr);
 
-        XMoveWindow(wm->dpy, wm->clients[i].win, next_attr.x, next_attr.y);  
+        XMoveWindow(wm->dpy, c->win, next_attr.x, next_attr.y);  
     }
 }
 

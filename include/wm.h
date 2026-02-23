@@ -5,9 +5,10 @@
 
 #include "forward.h"
 
-typedef struct{
+struct Client{
     Window win;
-}Client;
+    Client *next;
+};
 
 typedef struct{
     Window win;
@@ -37,7 +38,7 @@ struct WM{
 
     Client *focused;
     Client *master;
-    Client clients[128];
+    Client *clients;
     int nclients;
     int usable_height;
     int usable_width;
@@ -62,7 +63,7 @@ void handle_XEvent(WM *wm, XEvent *ev);
 
 void manage(WM *wm, Window w);
 
-void unmanage(WM *wm, Window w);
+void unmanage(WM *wm, Window win);
 
 void focus(WM *wm, Client *c);
 
@@ -74,7 +75,7 @@ void kill_window(WM *wm, const Arg *arg);
 
 void set_master(WM *wm, const Arg *arg);
 
-Client* wintoclient(WM *wm, Window w);
+Client* wintoclient(WM *wm, Window win);
 
 int is_dock(WM *wm, Window win);
 

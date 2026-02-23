@@ -3,4 +3,5 @@
 
 typedef struct WM WM;
 
+typedef struct Client Client;
 #endif

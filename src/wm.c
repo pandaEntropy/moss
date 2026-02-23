@@ -82,12 +82,11 @@ void focus_direction(WM *wm, const Arg *arg) {
     int fx = fa.x + fa.width / 2;
     int fy = fa.y + fa.height / 2;
 
-    for (int i = 0; i < wm->nclients; i++) {
-        Client *w = &wm->clients[i];
-        if (w == wm->focused) continue;
+    for (Client *c = wm->clients; c; c = c->next) {
+        if (c == wm->focused) continue;
 
         XWindowAttributes wa;
-        XGetWindowAttributes(wm->dpy, w->win, &wa);
+        XGetWindowAttributes(wm->dpy, c->win, &wa);
 
         //get the center of the window that we are comparing
         int wx = wa.x + wa.width / 2;
@@ -102,27 +101,27 @@ void focus_direction(WM *wm, const Arg *arg) {
 
         //evaluate each calculated distance based on direction and penalize offset on the unfocused direction
         switch (dir) {
-            case DIR_LEFT:  
-                valid = dx < 0; 
-                dist = -dx + abs(dy); 
+            case DIR_LEFT:
+                valid = dx < 0;
+                dist = -dx + abs(dy);
                 break;
-            case DIR_RIGHT: 
-                valid = dx > 0; 
-                dist = dx + abs(dy); 
+            case DIR_RIGHT:
+                valid = dx > 0;
+                dist = dx + abs(dy);
                 break;
-            case DIR_UP:    
-                valid = dy < 0; 
-                dist = -dy + abs(dx); 
+            case DIR_UP:
+                valid = dy < 0;
+                dist = -dy + abs(dx);
                 break;
-            case DIR_DOWN:  
-                valid = dy > 0; 
-                dist = dy + abs(dx); 
+            case DIR_DOWN:
+                valid = dy > 0;
+                dist = dy + abs(dx);
                 break;
         }
 
         //get the records
         if (valid && dist < bestdist) {
-            best = w;
+            best = c;
             bestdist = dist;
         }
     }
@@ -153,7 +152,7 @@ void kill_window(WM *wm, const Arg *arg){
     int n; //Number of protocols the client has
     Atom wm_delete = XInternAtom(wm->dpy, "WM_DELETE_WINDOW", False);
     Atom wm_protocols = XInternAtom(wm->dpy, "WM_PROTOCOLS", False);
-    
+
     if(XGetWMProtocols(wm->dpy, wm->focused->win, &protocols, &n)){
         for(int i = 0; i < n; i++){
             if(protocols[i] == wm_delete){
@@ -188,60 +187,55 @@ void manage(WM *wm, Window win){
         tile(wm);
         return;
     }
-    Client *c = &wm->clients[wm->nclients];
+    Client *c = malloc(sizeof(Client));
+    if(!c) return;
     c->win = win;
-    wm->nclients++;
+    c->next = wm->clients;
+    wm->clients = c;
     focus(wm, c);
-    if(wm->nclients == 1)
-        wm->master = c;
+    wm->nclients++;
+    if(wm->nclients == 1) wm->master = c;
     tile(wm);
 }
 
 
-void unmanage(WM *wm, Window w){
-    if(unmanage_dock(wm, w)){
+void unmanage(WM *wm, Window win){
+    if(unmanage_dock(wm, win)){
         recalc_usable_area(wm);
         tile(wm);
         return;
     }
 
-    int idx = -1;
+    Client *prev = NULL;
+    Client *cur = wm->clients;
 
-    for (int i = 0; i < wm->nclients; i++) {
-        if (wm->clients[i].win == w) {
-            idx = i;
+    while(cur){
+        if(cur->win == win)
             break;
-        }
+
+        prev = cur;
+        cur = cur->next;
     }
 
-    if (idx == -1) return;
+    if(!cur) return; //client not found 
 
-    Client *removed = &wm->clients[idx];
+    bool was_master = (cur == wm->master);
+    bool was_focused = (cur == wm->focused);
 
-    bool was_focused = (wm->focused == removed);
-    bool was_master  = (wm->master  == removed);
+    if(prev)
+        prev->next = cur->next;
+    else
+        wm->clients = cur->next;
 
-    for (int i = idx; i < wm->nclients - 1; i++)
-        wm->clients[i] = wm->clients[i + 1];
+    if(was_master)
+        wm->master = wm->clients;
+    if(was_focused)
+        wm->focused = wm->master;
 
     wm->nclients--;
 
-    if (wm->nclients == 0) {
-        wm->focused = NULL;
-        wm->master  = NULL;
-        XSetInputFocus(wm->dpy, wm->root, RevertToParent, CurrentTime);
-        return;
-    }
-
-    if (was_master)
-        wm->master = &wm->clients[0];
-
-    if (was_focused)
-        focus(wm, wm->master);
-    else
-        focus(wm, wm->focused);
-
     tile(wm);
+    free(cur); //free the removed client
 }
 
 void focus(WM *wm, Client *c){
@@ -257,10 +251,11 @@ void set_master(WM *wm, const Arg *arg){
     tile(wm);
 }
 
-Client* wintoclient(WM *wm, Window w){
-    for(int i = 0; i < wm->nclients; i++){
-        if(wm->clients[i].win == w)
-            return &wm->clients[i];
+Client* wintoclient(WM *wm, Window win){
+    for(Client *c = wm->clients; c; c = c->next){
+        if(c->win == win){
+            return c;
+        }
     }
     return NULL;
 }

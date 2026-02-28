@@ -16,7 +16,11 @@
 bool subwin_unmapped = false;
 
 void OnMapRequest(WM *wm, XMapRequestEvent* ev){
-    XMapWindow(wm->dpy, ev->window);
+    XWindowAttributes wa;
+    XGetWindowAttributes(wm->dpy, ev->window, &wa);
+    if(wa.override_redirect)
+        return;
+
     manage(wm, ev->window);
 }
 
@@ -177,25 +181,57 @@ void kill_window(WM *wm, const Arg *arg){
 }
 
 void manage(WM *wm, Window win){
-    if(is_dock(wm, win)){
-        Dock *dock = &wm->docks[wm->ndocks];
-        wm->ndocks++;
-        dock->win = win;
-        get_strut(wm, dock);
-        recalc_usable_area(wm);
-        XMapWindow(wm->dpy, win);
-        tile(wm);
+    Wintype type = classify_window(wm, win);
+
+    if(type == WIN_DOCK){
+        handle_dock(wm, win);
         return;
     }
+
     Client *c = malloc(sizeof(Client));
     if(!c) return;
+
     c->win = win;
     c->next = wm->clients;
+    c->floating = false;
+
     wm->clients = c;
-    focus(wm, c);
     wm->nclients++;
-    if(wm->nclients == 1) wm->master = c;
-    tile(wm);
+
+    switch(type){
+        case WIN_DIALOG:
+            c->floating = true;
+            break;
+
+        case WIN_SPLASH:
+            c->floating = true;
+            break;
+
+        case WIN_DOCK:
+        case WIN_MENU:
+            c->floating = true;
+
+        case WIN_NORMAL:
+        default:
+            break;
+    }
+
+    XMapWindow(wm->dpy, win);
+
+    if(c->floating){
+        Window parent = get_transient(wm, win);
+        if(parent) parent_center(wm, parent, win);
+        else screen_center(wm, win);
+    }
+
+    focus(wm, c);
+
+    if(!c->floating){
+        if(wm->nclients == 1)
+            wm->master = c;
+
+        tile(wm);
+    }
 }
 
 
@@ -260,40 +296,15 @@ Client* wintoclient(WM *wm, Window win){
     return NULL;
 }
 
-int is_dock(WM *wm, Window win){
-    Atom actual_type;
-    int actual_format;
-    unsigned long nitems, bytes_after;
-    unsigned char *data = NULL;
-    if(XGetWindowProperty(
-                wm->dpy,
-                win,
-                wm->net_win_type,
-                0,
-                64,
-                False,
-                XA_ATOM,
-                &actual_type,
-                &actual_format,
-                &nitems,
-                &bytes_after,
-                &data) != Success)
-        return 0;
-    if(data == NULL){
-        return 0;
-    }
-    //Recast to atom ptr because data is unsigned char initially
-    Atom *atoms = (Atom *)data;
-
+int has_wintype(int nitems, Atom *atoms, Atom type){
     int res = 0;
 
     for(unsigned long i = 0; i < nitems; i++){
-        if(atoms[i] == wm->net_win_type_dock){
+        if(atoms[i] == type){
             res = 1;
             break;
         }
     }
-    XFree(data);
     return res;
 }
 
@@ -363,4 +374,96 @@ int unmanage_dock(WM *wm, Window win){
 
     wm->ndocks--;
     return 1;
+}
+
+Client* get_client(WM *wm, Window win){
+    for(Client *c = wm->clients; c; c = c->next){
+        if(c->win == win)
+            return c;
+    }
+
+    return NULL;
+}
+
+Wintype classify_window(WM *wm, Window win){
+    Atom actual_type;
+    int actual_format;
+    unsigned long nitems, bytes_after;
+    unsigned char *data = NULL;
+
+    Wintype type = WIN_NORMAL;
+
+    if(XGetWindowProperty(
+                wm->dpy,
+                win,
+                wm->net_win_type,
+                0,
+                32,
+                False,
+                XA_ATOM,
+                &actual_type,
+                &actual_format,
+                &nitems,
+                &bytes_after,
+                &data) != Success)
+        return WIN_NORMAL;
+
+    if(actual_type != XA_ATOM || actual_format != 32 || data == NULL)
+        goto cleanup;
+
+    //Recast to atom ptr because data is unsigned char initially
+    Atom *atoms = (Atom *)data;
+
+    if(has_wintype(nitems, atoms, wm->net_wintype_dialog)){
+        type = WIN_DIALOG;
+        goto cleanup;
+    }
+
+    if(has_wintype(nitems, atoms, wm->net_wintype_menu)){
+        type = WIN_MENU;
+        goto cleanup;
+    }
+
+    if(has_wintype(nitems, atoms, wm->net_win_type_dock)){
+        type = WIN_DOCK;
+        goto cleanup;
+    }
+
+    if(has_wintype(nitems, atoms, wm->net_wintype_splash)){
+        type = WIN_SPLASH;
+        goto cleanup;
+    }
+
+    Window parent;
+    if(XGetTransientForHint(wm->dpy, win, &parent)){
+        type = WIN_DIALOG;
+    }
+
+cleanup:
+    if(data)
+        XFree(data);
+
+    return type;
+}
+
+void handle_dock(WM *wm, Window win){
+    Dock *dock = &wm->docks[wm->ndocks];
+    wm->ndocks++;
+    dock->win = win;
+
+    get_strut(wm, dock);
+    recalc_usable_area(wm);
+
+    XMapWindow(wm->dpy, win);
+    tile(wm);
+    return;
+}
+
+Window get_transient(WM *wm, Window win){
+    Window transient = None;
+
+    if(XGetTransientForHint(wm->dpy, win, &transient))
+        return transient;
+
+    return None;
 }

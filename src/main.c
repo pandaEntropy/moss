@@ -46,12 +46,21 @@ int main(void)
     wm.net_win_type_dock = XInternAtom(wm.dpy, "_NET_WM_WINDOW_TYPE_DOCK", False);
     wm.net_strut_partial = XInternAtom(wm.dpy, "_NET_WM_STRUT_PARTIAL", False);
 
+    wm.net_wintype_dialog = XInternAtom(wm.dpy, "_NET_WM_WINDOW_TYPE_DIALOG", False);
+    wm.net_wintype_menu = XInternAtom(wm.dpy, "_NET_WM_WINDOW_TYPE_MENU", False);
+    wm.net_wintype_splash = XInternAtom(wm.dpy, "_NET_WM_WINDOW_TYPE_SPLASH", False);
+    wm.net_wintype_normal = XInternAtom(wm.dpy, "_NET_WM_WINDOW_TYPE_NORMAL", False);
+
+    wm.net_transient_for = XInternAtom(wm.dpy, "_NET_WM_TRANSIENT_FOR", False);
+
     Atom net_supported = XInternAtom(wm.dpy, "_NET_SUPPORTED", False);
 
     Atom supported[] = {
         wm.net_strut_partial,
         wm.net_win_type,
-        wm.net_win_type_dock
+        wm.net_win_type_dock,
+        wm.net_wintype_dialog,
+        wm.net_wintype_menu
     };
 
     XChangeProperty(wm.dpy,

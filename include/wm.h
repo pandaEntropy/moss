@@ -2,12 +2,14 @@
 #define MYWM_H
 
 #include <X11/Xlib.h>
+#include <stdbool.h>
 
 #include "forward.h"
 
 struct Client{
     Window win;
     Client *next;
+    bool floating;
 };
 
 typedef struct{
@@ -30,6 +32,14 @@ typedef enum{
     DIR_UP
 }Direction;
 
+typedef enum{
+    WIN_DIALOG,
+    WIN_SPLASH,
+    WIN_MENU,
+    WIN_DOCK,
+    WIN_NORMAL
+}Wintype;
+
 struct WM{
     Display *dpy;
     Window root;
@@ -46,6 +56,13 @@ struct WM{
     Atom net_win_type;
     Atom net_win_type_dock;
     Atom net_strut_partial;
+
+    Atom net_wintype_dialog;
+    Atom net_wintype_menu;
+    Atom net_wintype_splash;
+    Atom net_wintype_normal;
+
+    Atom net_transient_for;
 
     Dock docks[16];
     int ndocks;
@@ -77,11 +94,20 @@ void set_master(WM *wm, const Arg *arg);
 
 Client* wintoclient(WM *wm, Window win);
 
-int is_dock(WM *wm, Window win);
+int has_wintype(int nitems, Atom *atoms, Atom type);
 
 int get_strut(WM *wm, Dock *dock);
 
 void recalc_usable_area(WM *wm);
 
 int unmanage_dock(WM *wm, Window win);
+
+Client* get_client(WM *wm, Window win); 
+
+Wintype classify_window(WM *wm, Window win);
+
+void handle_dock(WM *wm, Window win);
+
+Window get_transient(WM *wm, Window win);
+
 #endif

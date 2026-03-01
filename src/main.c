@@ -51,7 +51,7 @@ int main(void)
     wm.net_wintype_splash = XInternAtom(wm.dpy, "_NET_WM_WINDOW_TYPE_SPLASH", False);
     wm.net_wintype_normal = XInternAtom(wm.dpy, "_NET_WM_WINDOW_TYPE_NORMAL", False);
 
-    wm.net_transient_for = XInternAtom(wm.dpy, "_NET_WM_TRANSIENT_FOR", False);
+    wm.net_active_window = XInternAtom(wm.dpy, "_NET_ACTIVE_WINDOW", False);
 
     Atom net_supported = XInternAtom(wm.dpy, "_NET_SUPPORTED", False);
 

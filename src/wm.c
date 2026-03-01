@@ -207,10 +207,11 @@ void manage(WM *wm, Window win){
             c->floating = true;
             break;
 
-        case WIN_DOCK:
         case WIN_MENU:
             c->floating = true;
+            break;
 
+        case WIN_DOCK:
         case WIN_NORMAL:
         default:
             break;
@@ -276,8 +277,12 @@ void unmanage(WM *wm, Window win){
 
 void focus(WM *wm, Client *c){
     if(!c) return;
+
     wm->focused = c;
+
     XSetInputFocus(wm->dpy, c->win, RevertToParent, CurrentTime);
+
+    XChangeProperty(wm->dpy, wm->root, wm->net_active_window, XA_ATOM, 32, PropModeReplace, (unsigned char *)&c->win, 1);
 }
 
 void set_master(WM *wm, const Arg *arg){
@@ -466,4 +471,9 @@ Window get_transient(WM *wm, Window win){
         return transient;
 
     return None;
+}
+
+bool has_protocol(WM *wm, Atom protocol){
+    //XGetProperty and then check for the given protocol (can get help from kill window)
+    return false;
 }

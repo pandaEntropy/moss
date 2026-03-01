@@ -62,7 +62,7 @@ struct WM{
     Atom net_wintype_splash;
     Atom net_wintype_normal;
 
-    Atom net_transient_for;
+    Atom net_active_window;
 
     Dock docks[16];
     int ndocks;

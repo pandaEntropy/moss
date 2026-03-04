@@ -53,6 +53,10 @@ int main(void)
 
     wm.net_active_window = XInternAtom(wm.dpy, "_NET_ACTIVE_WINDOW", False);
 
+    wm.wm_protocols = XInternAtom(wm.dpy, "WM_PROTOCOLS", False);
+    wm.wm_delete_window = XInternAtom(wm.dpy, "WM_DELETE_WINDOW", False);
+    wm.wm_take_focus = XInternAtom(wm.dpy, "WM_TAKE_FOCUS", False);
+
     Atom net_supported = XInternAtom(wm.dpy, "_NET_SUPPORTED", False);
 
     Atom supported[] = {

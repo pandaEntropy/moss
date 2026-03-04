@@ -150,23 +150,21 @@ void unmap(WM *wm, const Arg *arg){
 
 void kill_window(WM *wm, const Arg *arg){
     (void)arg;
-    if(wm->focused == NULL) return;
+    if(!wm->focused) return;
 
     Atom *protocols;
     int n; //Number of protocols the client has
-    Atom wm_delete = XInternAtom(wm->dpy, "WM_DELETE_WINDOW", False);
-    Atom wm_protocols = XInternAtom(wm->dpy, "WM_PROTOCOLS", False);
 
     if(XGetWMProtocols(wm->dpy, wm->focused->win, &protocols, &n)){
         for(int i = 0; i < n; i++){
-            if(protocols[i] == wm_delete){
+            if(protocols[i] == wm->wm_delete_window){
                 XEvent ev = {0};
                 ev.type = ClientMessage;
                 ev.xclient.window = wm->focused->win;
-                ev.xclient.message_type = wm_protocols;
+                ev.xclient.message_type = wm->wm_protocols;
                 ev.xclient.format = 32;
                 // l type because format is 32 bits
-                ev.xclient.data.l[0] = wm_delete;
+                ev.xclient.data.l[0] = wm->wm_delete_window;
                 ev.xclient.data.l[1] = CurrentTime;
 
                 XSendEvent(wm->dpy, wm->focused->win, False, NoEventMask, &ev);
@@ -197,6 +195,8 @@ void manage(WM *wm, Window win){
 
     wm->clients = c;
     wm->nclients++;
+
+    set_protocols(wm, c);
 
     switch(type){
         case WIN_DIALOG:
@@ -276,9 +276,27 @@ void unmanage(WM *wm, Window win){
 }
 
 void focus(WM *wm, Client *c){
-    if(!c) return;
+    if(!c || wm->focused == c) return;
 
     wm->focused = c;
+
+    if(c->protocols & PROTO_TAKE_FOCUS){
+        XEvent ev = {0};
+
+        ev.xclient.type = ClientMessage;
+        ev.xclient.window = c->win;
+        ev.xclient.message_type = wm->wm_protocols;
+        ev.xclient.format = 32;
+        ev.xclient.data.l[0] = wm->wm_take_focus;
+        ev.xclient.data.l[1] = CurrentTime;
+
+        XSendEvent(
+            wm->dpy,
+            c->win,
+            False,
+            NoEventMask,
+            &ev);
+    }
 
     XSetInputFocus(wm->dpy, c->win, RevertToParent, CurrentTime);
 
@@ -304,7 +322,7 @@ Client* wintoclient(WM *wm, Window win){
 int has_wintype(int nitems, Atom *atoms, Atom type){
     int res = 0;
 
-    for(unsigned long i = 0; i < nitems; i++){
+    for(int i = 0; i < nitems; i++){
         if(atoms[i] == type){
             res = 1;
             break;
@@ -461,6 +479,7 @@ void handle_dock(WM *wm, Window win){
 
     XMapWindow(wm->dpy, win);
     tile(wm);
+
     return;
 }
 
@@ -473,7 +492,24 @@ Window get_transient(WM *wm, Window win){
     return None;
 }
 
-bool has_protocol(WM *wm, Atom protocol){
-    //XGetProperty and then check for the given protocol (can get help from kill window)
-    return false;
+void set_protocols(WM *wm, Client *c){
+
+    c->protocols = 0;
+
+    Atom *protocols;
+    int nproto;
+
+    if(XGetWMProtocols(wm->dpy, c->win, &protocols, &nproto)){
+        for(int i = 0; i < nproto; i++){
+
+            if(protocols[i] == wm->wm_delete_window)
+                c->protocols |= PROTO_DELETE;
+
+            if(protocols[i] == wm->wm_take_focus)
+                c->protocols |= PROTO_TAKE_FOCUS;
+        }
+    }
+
+    XFree(protocols);
+    return;
 }

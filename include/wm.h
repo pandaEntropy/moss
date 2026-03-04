@@ -6,10 +6,14 @@
 
 #include "forward.h"
 
+#define PROTO_DELETE (1 << 0)
+#define PROTO_TAKE_FOCUS (1 << 1)
+
 struct Client{
     Window win;
     Client *next;
     bool floating;
+    unsigned int protocols;
 };
 
 typedef struct{
@@ -64,6 +68,10 @@ struct WM{
 
     Atom net_active_window;
 
+    Atom wm_protocols;
+    Atom wm_take_focus;
+    Atom wm_delete_window;
+
     Dock docks[16];
     int ndocks;
 };
@@ -109,5 +117,7 @@ Wintype classify_window(WM *wm, Window win);
 void handle_dock(WM *wm, Window win);
 
 Window get_transient(WM *wm, Window win);
+
+void set_protocols(WM *wm, Client *c);
 
 #endif

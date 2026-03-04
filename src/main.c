@@ -3,10 +3,32 @@
 #include <X11/keysym.h>
 #include <X11/cursorfont.h>
 #include <errno.h>
+#include <stdio.h>
 
 #include "wm.h"
 #include "keys.h"
 #include "ipc.h"
+
+static int startup_err = 0;
+
+int startup_handler(Display *dpy, XErrorEvent *ev){
+    if(ev->error_code == BadAccess)
+        startup_err = 1;
+
+    return 0;
+}
+
+int general_handler(Display *dpy, XErrorEvent *ev){
+    if(ev->error_code == BadWindow)
+        return 0;
+
+    char buf[256];
+    XGetErrorText(dpy, ev->error_code, buf, sizeof(buf));
+
+    fprintf(stderr, "X Error: %s (request = %d)\n", buf, ev->request_code);
+
+    return 0;
+}
 
 int main(void)
 {
@@ -22,14 +44,25 @@ int main(void)
     wm.usable_height = wm.sh;
     wm.usable_width = wm.sw;
 
-    //basically disables focus on hover
-    XSetInputFocus(wm.dpy, None, RevertToParent, CurrentTime);
+    XSetErrorHandler(startup_handler);
 
     XSelectInput(wm.dpy, wm.root, SubstructureRedirectMask | 
             SubstructureNotifyMask |
             EnterWindowMask |
             LeaveWindowMask |
             FocusChangeMask);
+
+    XSync(wm.dpy, False);
+
+    if(startup_err){
+        fprintf(stderr, "Another WM is currently running\n");
+        return 1;
+    }
+
+    XSetErrorHandler(general_handler);
+
+    //disables focus on hover
+    XSetInputFocus(wm.dpy, None, RevertToParent, CurrentTime);
 
     key_setup(wm.dpy); //grabs all the necessary keys
 

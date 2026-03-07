@@ -13,6 +13,7 @@ struct Client{
     Window win;
     Client *next;
     bool floating;
+    bool monocle;
     unsigned int protocols;
 };
 
@@ -44,6 +45,24 @@ typedef enum{
     WIN_NORMAL
 }Wintype;
 
+typedef struct{
+    Atom net_wm_win_type;
+    Atom net_wm_win_type_dock;
+    Atom net_strut_partial;
+
+    Atom net_wm_win_type_dialog;
+    Atom net_wm_win_type_menu;
+    Atom net_wm_win_type_splash;
+    Atom net_wm_win_type_normal;
+
+    Atom net_active_window;
+
+    Atom wm_protocols;
+    Atom wm_take_focus;
+    Atom wm_delete_window;
+ 
+}Atoms;
+
 struct WM{
     Display *dpy;
     Window root;
@@ -57,20 +76,7 @@ struct WM{
     int usable_height;
     int usable_width;
 
-    Atom net_win_type;
-    Atom net_win_type_dock;
-    Atom net_strut_partial;
-
-    Atom net_wintype_dialog;
-    Atom net_wintype_menu;
-    Atom net_wintype_splash;
-    Atom net_wintype_normal;
-
-    Atom net_active_window;
-
-    Atom wm_protocols;
-    Atom wm_take_focus;
-    Atom wm_delete_window;
+    Atoms atoms;
 
     Dock docks[16];
     int ndocks;
@@ -119,5 +125,7 @@ void handle_dock(WM *wm, Window win);
 Window get_transient(WM *wm, Window win);
 
 void set_protocols(WM *wm, Client *c);
+
+void init_atoms(WM *wm);
 
 #endif

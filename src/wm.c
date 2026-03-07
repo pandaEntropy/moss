@@ -134,6 +134,17 @@ void focus_direction(WM *wm, const Arg *arg) {
         focus(wm, best);
 }
 
+void monocle_focus(WM *wm, int dir){
+    if(dir == DIR_RIGHT){
+        wm->focused->monocle = false;
+        focus(wm, wm->focused->next);
+        wm->focused->monocle = true;
+        tile(wm);
+    }
+
+    //finish this after implenting doubly linked list functionality
+}
+
 void unmap(WM *wm, const Arg *arg){
     (void)arg;
     if(wm->nclients < 1) return;
@@ -152,28 +163,21 @@ void kill_window(WM *wm, const Arg *arg){
     (void)arg;
     if(!wm->focused) return;
 
-    Atom *protocols;
-    int n; //Number of protocols the client has
+    //later add a Client param to call kill on clients other than focused
+    if(wm->focused->protocols & PROTO_DELETE){
+        XEvent ev = {0};
+        ev.type = ClientMessage;
+        ev.xclient.window = wm->focused->win;
+        ev.xclient.message_type = wm->atoms.wm_protocols;
+        ev.xclient.format = 32;
+        // l type because format is 32 bits
+        ev.xclient.data.l[0] = wm->atoms.wm_delete_window;
+        ev.xclient.data.l[1] = CurrentTime;
 
-    if(XGetWMProtocols(wm->dpy, wm->focused->win, &protocols, &n)){
-        for(int i = 0; i < n; i++){
-            if(protocols[i] == wm->wm_delete_window){
-                XEvent ev = {0};
-                ev.type = ClientMessage;
-                ev.xclient.window = wm->focused->win;
-                ev.xclient.message_type = wm->wm_protocols;
-                ev.xclient.format = 32;
-                // l type because format is 32 bits
-                ev.xclient.data.l[0] = wm->wm_delete_window;
-                ev.xclient.data.l[1] = CurrentTime;
-
-                XSendEvent(wm->dpy, wm->focused->win, False, NoEventMask, &ev);
-                XFree(protocols);
-                return;
-            }
-        }
-        XFree(protocols);
+        XSendEvent(wm->dpy, wm->focused->win, False, NoEventMask, &ev);
+        return;
     }
+
     //If client is not ICCCM compliant
     XKillClient(wm->dpy, wm->focused->win);
 }
@@ -285,9 +289,9 @@ void focus(WM *wm, Client *c){
 
         ev.xclient.type = ClientMessage;
         ev.xclient.window = c->win;
-        ev.xclient.message_type = wm->wm_protocols;
+        ev.xclient.message_type = wm->atoms.wm_protocols;
         ev.xclient.format = 32;
-        ev.xclient.data.l[0] = wm->wm_take_focus;
+        ev.xclient.data.l[0] = wm->atoms.wm_take_focus;
         ev.xclient.data.l[1] = CurrentTime;
 
         XSendEvent(
@@ -300,7 +304,7 @@ void focus(WM *wm, Client *c){
 
     XSetInputFocus(wm->dpy, c->win, RevertToParent, CurrentTime);
 
-    XChangeProperty(wm->dpy, wm->root, wm->net_active_window, XA_ATOM, 32, PropModeReplace, (unsigned char *)&c->win, 1);
+    XChangeProperty(wm->dpy, wm->root, wm->atoms.net_active_window, XA_ATOM, 32, PropModeReplace, (unsigned char *)&c->win, 1);
 }
 
 void set_master(WM *wm, const Arg *arg){
@@ -340,7 +344,7 @@ int get_strut(WM *wm, Dock *dock){
     if(XGetWindowProperty(
                 wm->dpy,
                 dock->win,
-                wm->net_strut_partial,
+                wm->atoms.net_strut_partial,
                 0,
                 12,
                 False,
@@ -419,7 +423,7 @@ Wintype classify_window(WM *wm, Window win){
     if(XGetWindowProperty(
                 wm->dpy,
                 win,
-                wm->net_win_type,
+                wm->atoms.net_wm_win_type,
                 0,
                 32,
                 False,
@@ -437,22 +441,22 @@ Wintype classify_window(WM *wm, Window win){
     //Recast to atom ptr because data is unsigned char initially
     Atom *atoms = (Atom *)data;
 
-    if(has_wintype(nitems, atoms, wm->net_wintype_dialog)){
+    if(has_wintype(nitems, atoms, wm->atoms.net_wm_win_type_dialog)){
         type = WIN_DIALOG;
         goto cleanup;
     }
 
-    if(has_wintype(nitems, atoms, wm->net_wintype_menu)){
+    if(has_wintype(nitems, atoms, wm->atoms.net_wm_win_type_menu)){
         type = WIN_MENU;
         goto cleanup;
     }
 
-    if(has_wintype(nitems, atoms, wm->net_win_type_dock)){
+    if(has_wintype(nitems, atoms, wm->atoms.net_wm_win_type_dock)){
         type = WIN_DOCK;
         goto cleanup;
     }
 
-    if(has_wintype(nitems, atoms, wm->net_wintype_splash)){
+    if(has_wintype(nitems, atoms, wm->atoms.net_wm_win_type_splash)){
         type = WIN_SPLASH;
         goto cleanup;
     }
@@ -502,10 +506,10 @@ void set_protocols(WM *wm, Client *c){
     if(XGetWMProtocols(wm->dpy, c->win, &protocols, &nproto)){
         for(int i = 0; i < nproto; i++){
 
-            if(protocols[i] == wm->wm_delete_window)
+            if(protocols[i] == wm->atoms.wm_delete_window)
                 c->protocols |= PROTO_DELETE;
 
-            if(protocols[i] == wm->wm_take_focus)
+            if(protocols[i] == wm->atoms.wm_take_focus)
                 c->protocols |= PROTO_TAKE_FOCUS;
         }
     }
@@ -513,3 +517,21 @@ void set_protocols(WM *wm, Client *c){
     XFree(protocols);
     return;
 }
+
+void init_atoms(WM *wm){
+    wm->atoms.net_wm_win_type = XInternAtom(wm->dpy, "_NET_WM_WINDOW_TYPE", False);
+    wm->atoms.net_wm_win_type_dock = XInternAtom(wm->dpy, "_NET_WM_WINDOW_TYPE_DOCK", False);
+    wm->atoms.net_strut_partial = XInternAtom(wm->dpy, "_NET_WM_STRUT_PARTIAL", False);
+
+    wm->atoms.net_wm_win_type_dialog = XInternAtom(wm->dpy, "_NET_WM_WINDOW_TYPE_DIALOG", False);
+    wm->atoms.net_wm_win_type_menu = XInternAtom(wm->dpy, "_NET_WM_WINDOW_TYPE_MENU", False);
+    wm->atoms.net_wm_win_type_splash = XInternAtom(wm->dpy, "_NET_WM_WINDOW_TYPE_SPLASH", False);
+    wm->atoms.net_wm_win_type_normal = XInternAtom(wm->dpy, "_NET_WM_WINDOW_TYPE_NORMAL", False);
+
+    wm->atoms.net_active_window = XInternAtom(wm->dpy, "_NET_ACTIVE_WINDOW", False);
+
+    wm->atoms.wm_protocols = XInternAtom(wm->dpy, "WM_PROTOCOLS", False);
+    wm->atoms.wm_delete_window = XInternAtom(wm->dpy, "WM_DELETE_WINDOW", False);
+    wm->atoms.wm_take_focus = XInternAtom(wm->dpy, "WM_TAKE_FOCUS", False);
+}
+

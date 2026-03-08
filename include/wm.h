@@ -12,8 +12,8 @@
 struct Client{
     Window win;
     Client *next;
+    Client *prev;
     bool floating;
-    bool monocle;
     unsigned int protocols;
 };
 
@@ -127,5 +127,7 @@ Window get_transient(WM *wm, Window win);
 void set_protocols(WM *wm, Client *c);
 
 void init_atoms(WM *wm);
+
+Client *last_client(WM *wm);
 
 #endif

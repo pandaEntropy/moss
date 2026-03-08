@@ -135,14 +135,23 @@ void focus_direction(WM *wm, const Arg *arg) {
 }
 
 void monocle_focus(WM *wm, int dir){
+    if(wm->nclients < 2) return;
+
     if(dir == DIR_RIGHT){
-        wm->focused->monocle = false;
-        focus(wm, wm->focused->next);
-        wm->focused->monocle = true;
-        tile(wm);
+        if(wm->focused->next)
+            focus(wm, wm->focused->next);
+        else
+            focus(wm, wm->clients);
     }
 
-    //finish this after implenting doubly linked list functionality
+    else if(dir == DIR_LEFT){
+        if(wm->focused->prev)
+            focus(wm, wm->focused->prev);
+
+        else
+            focus(wm, last_client(wm));
+
+    } 
 }
 
 void unmap(WM *wm, const Arg *arg){
@@ -190,12 +199,14 @@ void manage(WM *wm, Window win){
         return;
     }
 
-    Client *c = malloc(sizeof(Client));
+    Client *c = calloc(1, sizeof(Client));
     if(!c) return;
 
     c->win = win;
     c->next = wm->clients;
-    c->floating = false;
+
+    if(wm->clients)
+        wm->clients->prev = c;
 
     wm->clients = c;
     wm->nclients++;
@@ -247,36 +258,39 @@ void unmanage(WM *wm, Window win){
         return;
     }
 
-    Client *prev = NULL;
-    Client *cur = wm->clients;
+    Client *c = wintoclient(wm, win);
+    if(!c) return;
 
-    while(cur){
-        if(cur->win == win)
-            break;
+    bool was_master = (c == wm->master);
+    bool was_focused = (c == wm->focused);
 
-        prev = cur;
-        cur = cur->next;
+
+    if(c->prev)
+        c->prev->next = c->next;
+    else{
+        wm->clients = c->next;
+        if(wm->clients)
+            wm->clients->prev = NULL;
     }
 
-    if(!cur) return; //client not found 
-
-    bool was_master = (cur == wm->master);
-    bool was_focused = (cur == wm->focused);
-
-    if(prev)
-        prev->next = cur->next;
-    else
-        wm->clients = cur->next;
+    if(c->next)
+        c->next->prev = c->prev;
 
     if(was_master)
         wm->master = wm->clients;
-    if(was_focused)
-        wm->focused = wm->master;
 
+    if(was_focused){
+        if(c->next)
+            focus(wm, c->next);
+        else if(c->prev)
+            focus(wm, c->prev);
+        else
+            wm->focused = NULL;
+    }
     wm->nclients--;
 
     tile(wm);
-    free(cur); //free the removed client
+    free(c); //free the removed client
 }
 
 void focus(WM *wm, Client *c){
@@ -535,3 +549,11 @@ void init_atoms(WM *wm){
     wm->atoms.wm_take_focus = XInternAtom(wm->dpy, "WM_TAKE_FOCUS", False);
 }
 
+Client *last_client(WM *wm){
+    for(Client *c = wm->clients; c; c = c->next){
+        if(!c->next)
+            return c;
+    }
+
+    return NULL;
+}

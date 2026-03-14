@@ -27,14 +27,14 @@ void spawn(WM *wm, const Arg *arg){
 }
 
 Command commands[] = {
-    {"focus_right", focus_direction, {.i = DIR_RIGHT}},
-    {"focus_left", focus_direction, {.i = DIR_LEFT}},
-    {"focus_down", focus_direction, {.i = DIR_DOWN}},
-    {"focus_up", focus_direction, {.i = DIR_UP}},
+    {"focus_right", cmd_focus, {.i = DIR_RIGHT}},
+    {"focus_left", cmd_focus, {.i = DIR_LEFT}},
+    {"focus_down", cmd_focus, {.i = DIR_DOWN}},
+    {"focus_up", cmd_focus, {.i = DIR_UP}},
     {"kill", kill_window, {0}},
     {"spawn", spawn, {.cparr = termcmd}},
     {"set_master", set_master, {0}},
-    {"rotate", rotate, {.i = LAYOUT_MASTER}},
+    {"rotate", rotate, {0}},
     {"unmap", unmap, {0}},
     {"resize_right", resize, {.i = DIR_RIGHT}},
     {"resize_left", resize, {.i = DIR_LEFT}},

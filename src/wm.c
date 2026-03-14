@@ -72,8 +72,25 @@ void handle_XEvent(WM *wm, XEvent *ev){
     }
 }
 
-void focus_direction(WM *wm, const Arg *arg) {
-    int dir = arg->i;
+void cmd_focus(WM *wm, const Arg *arg){
+    switch(wm->layout_mode){
+        case LAYOUT_HORIZONTAL:
+            focus_direction(wm, arg->i);
+            break;
+
+        case LAYOUT_MASTER:
+            focus_direction(wm, arg->i);
+            break;
+
+        case LAYOUT_MONOCLE:
+            monocle_focus(wm, arg->i);
+            tile(wm);
+            break;
+
+    }
+}
+
+void focus_direction(WM *wm, Direction dir) {
     if (!wm->focused) return;
 
     Client *best = NULL;
@@ -134,12 +151,13 @@ void focus_direction(WM *wm, const Arg *arg) {
         focus(wm, best);
 }
 
-void monocle_focus(WM *wm, int dir){
+void monocle_focus(WM *wm, Direction dir){
     if(wm->nclients < 2) return;
 
     if(dir == DIR_RIGHT){
-        if(wm->focused->next)
+        if(wm->focused->next){
             focus(wm, wm->focused->next);
+        }
         else
             focus(wm, wm->clients);
     }

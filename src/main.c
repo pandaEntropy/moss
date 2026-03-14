@@ -44,6 +44,8 @@ int main(void)
     wm.usable_height = wm.sh;
     wm.usable_width = wm.sw;
 
+    wm.layout_mode = LAYOUT_MONOCLE;
+
     XSetErrorHandler(startup_handler);
 
     XSelectInput(wm.dpy, wm.root, SubstructureRedirectMask | 

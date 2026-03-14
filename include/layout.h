@@ -11,16 +11,13 @@ typedef enum{
     MASTER_BOTTOM
 } MasterPosition;
 
-typedef enum{
-    LAYOUT_MASTER,
-    LAYOUT_HORIZONTAL
-}LayoutMode;
-
 void horizontal_tile(WM *wm);
 
 void tile(WM *wm);
 
 void master_tile(WM *wm);
+
+void monocle_tile(WM *wm);
 
 void rotate(WM *wm, const Arg *arg);
 

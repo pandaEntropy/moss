@@ -45,6 +45,12 @@ typedef enum{
     WIN_NORMAL
 }Wintype;
 
+typedef enum{
+    LAYOUT_MASTER,
+    LAYOUT_HORIZONTAL,
+    LAYOUT_MONOCLE
+}LayoutMode;
+
 typedef struct{
     Atom net_wm_win_type;
     Atom net_wm_win_type_dock;
@@ -80,6 +86,8 @@ struct WM{
 
     Dock docks[16];
     int ndocks;
+
+    LayoutMode layout_mode;
 };
 
 void OnMapRequest(WM *wm, XMapRequestEvent *ev);
@@ -98,7 +106,7 @@ void unmanage(WM *wm, Window win);
 
 void focus(WM *wm, Client *c);
 
-void focus_direction(WM *wm, const Arg *arg);
+void focus_direction(WM *wm, Direction dir);
 
 void unmap(WM *wm, const Arg *arg);
 
@@ -129,5 +137,11 @@ void set_protocols(WM *wm, Client *c);
 void init_atoms(WM *wm);
 
 Client *last_client(WM *wm);
+
+void monocle_focus(WM *wm, Direction dir);
+
+void cmd_focus(WM *wm, const Arg *arg);
+
+
 
 #endif

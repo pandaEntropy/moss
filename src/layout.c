@@ -3,7 +3,6 @@
 
 #include <X11/Xlib.h>
 
-LayoutMode tile_mode = LAYOUT_MASTER;
 MasterPosition master_pos = MASTER_LEFT;
 float mfactor = 0.5;
 int nmaster = 1;
@@ -17,12 +16,16 @@ void tile(WM *wm){
             ntiled++;
     }
 
-    switch(tile_mode){
+    switch(wm->layout_mode){
         case LAYOUT_HORIZONTAL:
             horizontal_tile(wm);
             break;
         case LAYOUT_MASTER:
             master_tile(wm);
+            break;
+
+        case LAYOUT_MONOCLE:
+            monocle_tile(wm);
             break;
     }
 }
@@ -115,7 +118,23 @@ void master_tile(WM *wm){
     }
 }
 
+void monocle_tile(WM *wm){
+    if(!wm->clients) return;
+
+    for(Client *c = wm->clients; c; c = c->next){
+        if(c->floating) continue;
+
+        XMoveResizeWindow(wm->dpy, c->win, 0, 0, wm->usable_width, wm->usable_height);
+    }
+
+    if(wm->focused)
+        XMapRaised(wm->dpy, wm->focused->win);
+
+}
+
 void resize(WM *wm, const Arg *arg){
+    if(wm->layout_mode == LAYOUT_MONOCLE) return;
+
     int dir = arg->i;
     float change = 0;
 
@@ -150,17 +169,19 @@ void resize(WM *wm, const Arg *arg){
 }
 
 void rotate(WM *wm, const Arg *arg){
+    (void)arg;
     if(ntiled < 2) return;
 
-    int mode = arg->i;
-
-    switch(mode){
+    switch(wm->layout_mode){
         case LAYOUT_HORIZONTAL:
             horizontal_rotate(wm);
             break;
 
         case LAYOUT_MASTER:
             master_rotate(wm);
+            break;
+
+        case LAYOUT_MONOCLE:
             break;
     }
 }

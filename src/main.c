@@ -44,7 +44,9 @@ int main(void)
     wm.usable_height = wm.sh;
     wm.usable_width = wm.sw;
 
-    wm.layout_mode = LAYOUT_MONOCLE;
+    wm.active_layout = LAYOUT_MONOCLE;
+
+    init_layouts(&wm);
 
     XSetErrorHandler(startup_handler);
 

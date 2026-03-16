@@ -9,15 +9,15 @@
 #define PROTO_DELETE (1 << 0)
 #define PROTO_TAKE_FOCUS (1 << 1)
 
-struct Client{
+typedef struct Client{
     Window win;
-    Client *next;
-    Client *prev;
+    struct Client *next;
+    struct Client *prev;
     bool floating;
     unsigned int protocols;
-};
+}Client;
 
-typedef struct{
+typedef struct Dock{
     Window win;
     int left;
     int right;
@@ -25,12 +25,12 @@ typedef struct{
     int bottom;
 }Dock;
 
-typedef struct{
+typedef struct Arg{
     int i;
     const char **cparr;
 }Arg;
 
-typedef enum{
+typedef enum Direction{
     DIR_LEFT,
     DIR_DOWN,
     DIR_RIGHT,
@@ -38,20 +38,19 @@ typedef enum{
 }Direction;
 
 typedef enum{
-    WIN_DIALOG,
-    WIN_SPLASH,
-    WIN_MENU,
-    WIN_DOCK,
-    WIN_NORMAL
-}Wintype;
-
-typedef enum{
     LAYOUT_MASTER,
     LAYOUT_HORIZONTAL,
     LAYOUT_MONOCLE
-}LayoutMode;
+}LayoutID;
 
-typedef struct{
+typedef struct Layout{
+    LayoutID id;
+    void (*tile)(WM *);
+    void (*rotate)(WM *);
+    void (*focus)(WM *, int);
+}Layout;
+
+typedef struct Atoms{
     Atom net_wm_win_type;
     Atom net_wm_win_type_dock;
     Atom net_strut_partial;
@@ -69,7 +68,7 @@ typedef struct{
  
 }Atoms;
 
-struct WM{
+typedef struct WM{
     Display *dpy;
     Window root;
     int sw;
@@ -84,29 +83,15 @@ struct WM{
 
     Atoms atoms;
 
-    Dock docks[16];
-    int ndocks;
-
-    LayoutMode layout_mode;
-};
-
-void OnMapRequest(WM *wm, XMapRequestEvent *ev);
-
-void OnConfigureRequest(WM *wm, XConfigureRequestEvent *ev);
-
-void OnKeyPress(WM *wm, XKeyEvent *ev);
-
-void OnDestroyNotify(WM *wm, XDestroyWindowEvent *ev);
+    int active_layout; //index of the active layout in layouts
+    Layout layouts[8];
+}WM;
 
 void handle_XEvent(WM *wm, XEvent *ev);
 
-void manage(WM *wm, Window w);
-
-void unmanage(WM *wm, Window win);
-
 void focus(WM *wm, Client *c);
 
-void focus_direction(WM *wm, Direction dir);
+void focus_direction(WM *wm, int dir);
 
 void unmap(WM *wm, const Arg *arg);
 
@@ -118,17 +103,7 @@ Client* wintoclient(WM *wm, Window win);
 
 int has_wintype(int nitems, Atom *atoms, Atom type);
 
-int get_strut(WM *wm, Dock *dock);
-
-void recalc_usable_area(WM *wm);
-
-int unmanage_dock(WM *wm, Window win);
-
 Client* get_client(WM *wm, Window win); 
-
-Wintype classify_window(WM *wm, Window win);
-
-void handle_dock(WM *wm, Window win);
 
 Window get_transient(WM *wm, Window win);
 
@@ -138,10 +113,10 @@ void init_atoms(WM *wm);
 
 Client *last_client(WM *wm);
 
-void monocle_focus(WM *wm, Direction dir);
+void monocle_focus(WM *wm, int dir);
 
 void cmd_focus(WM *wm, const Arg *arg);
 
-
+void init_layouts(WM *wm);
 
 #endif

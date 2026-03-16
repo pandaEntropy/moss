@@ -1,8 +1,8 @@
 #ifndef LAYOUT_H
 #define LAYOUT_H
 
-#include "wm.h"
 #include "forward.h"
+#include <X11/Xlib.h>
 
 typedef enum{
     MASTER_LEFT,
@@ -10,6 +10,12 @@ typedef enum{
     MASTER_RIGHT,
     MASTER_BOTTOM
 } MasterPosition;
+
+Layout master_layout();
+
+Layout horizontal_layout();
+
+Layout monocle_layout();
 
 void horizontal_tile(WM *wm);
 
@@ -22,6 +28,8 @@ void monocle_tile(WM *wm);
 void rotate(WM *wm, const Arg *arg);
 
 void master_rotate(WM *wm);
+
+void monocle_rotate(WM *wm);
 
 void horizontal_rotate(WM *wm);
 

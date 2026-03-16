@@ -13,7 +13,40 @@
 #include "keys.h"
 #include "forward.h"
 
+typedef enum Wintype{
+    WIN_DIALOG,
+    WIN_SPLASH,
+    WIN_MENU,
+    WIN_DOCK,
+    WIN_NORMAL
+}Wintype;
+
+Wintype classify_window(WM *wm, Window win);
+
+void handle_dock(WM *wm, Window win);
+
+void recalc_usable_area(WM *wm);
+
+int get_strut(WM *wm, Dock *dock);
+
+int unmanage_dock(WM *wm, Window win);
+
+void OnMapRequest(WM *wm, XMapRequestEvent *ev);
+
+void OnConfigureRequest(WM *wm, XConfigureRequestEvent *ev);
+
+void OnKeyPress(WM *wm, XKeyEvent *ev);
+
+void OnDestroyNotify(WM *wm, XDestroyWindowEvent *ev);
+
+void manage(WM *wm, Window w);
+
+void unmanage(WM *wm, Window win);
+
 bool subwin_unmapped = false;
+
+static Dock docks[4];
+static int ndocks = 0;
 
 void OnMapRequest(WM *wm, XMapRequestEvent* ev){
     XWindowAttributes wa;
@@ -73,24 +106,13 @@ void handle_XEvent(WM *wm, XEvent *ev){
 }
 
 void cmd_focus(WM *wm, const Arg *arg){
-    switch(wm->layout_mode){
-        case LAYOUT_HORIZONTAL:
-            focus_direction(wm, arg->i);
-            break;
+    wm->layouts[wm->active_layout].focus(wm, arg->i);
 
-        case LAYOUT_MASTER:
-            focus_direction(wm, arg->i);
-            break;
-
-        case LAYOUT_MONOCLE:
-            monocle_focus(wm, arg->i);
-            tile(wm);
-            break;
-
-    }
+    if(wm->layouts[wm->active_layout].id == LAYOUT_MONOCLE) 
+        tile(wm);
 }
 
-void focus_direction(WM *wm, Direction dir) {
+void focus_direction(WM *wm, int dir) {
     if (!wm->focused) return;
 
     Client *best = NULL;
@@ -138,6 +160,9 @@ void focus_direction(WM *wm, Direction dir) {
                 valid = dy > 0;
                 dist = dy + abs(dx);
                 break;
+
+            default:
+                return;
         }
 
         //get the records
@@ -151,7 +176,7 @@ void focus_direction(WM *wm, Direction dir) {
         focus(wm, best);
 }
 
-void monocle_focus(WM *wm, Direction dir){
+void monocle_focus(WM *wm, int dir){
     if(wm->nclients < 2) return;
 
     if(dir == DIR_RIGHT){
@@ -407,9 +432,9 @@ int get_strut(WM *wm, Dock *dock){
 
 void recalc_usable_area(WM *wm){
     int occ_height, occ_width;
-    for(int i = 0; i < wm->ndocks; i++){
-        occ_height = wm->docks[i].bottom + wm->docks[i].top;
-        occ_width = wm->docks[i].right + wm->docks[i].left;
+    for(int i = 0; i < ndocks; i++){
+        occ_height = docks[i].bottom + docks[i].top;
+        occ_width = docks[i].right + docks[i].left;
     }
 
     wm->usable_height = wm->sh - occ_height;
@@ -417,21 +442,22 @@ void recalc_usable_area(WM *wm){
 }
 
 int unmanage_dock(WM *wm, Window win){
+    (void)wm;
     int idx = -1;
 
-    for(int i = 0; i < wm->ndocks; i++){
-        if(wm->docks[i].win == win){
+    for(int i = 0; i < ndocks; i++){
+        if(docks[i].win == win){
             idx = i;
             break;
         }
     }
     if(idx == -1) return 0;
 
-    for(int i = idx; i < wm->ndocks-1; i++){
-        wm->docks[i] = wm->docks[i + 1];
+    for(int i = idx; i < ndocks-1; i++){
+        docks[i] = docks[i + 1];
     }
 
-    wm->ndocks--;
+    ndocks--;
     return 1;
 }
 
@@ -506,8 +532,8 @@ cleanup:
 }
 
 void handle_dock(WM *wm, Window win){
-    Dock *dock = &wm->docks[wm->ndocks];
-    wm->ndocks++;
+    Dock *dock = &docks[ndocks];
+    ndocks++;
     dock->win = win;
 
     get_strut(wm, dock);
@@ -574,4 +600,11 @@ Client *last_client(WM *wm){
     }
 
     return NULL;
+}
+
+void init_layouts(WM *wm){
+    //init order must match LayoutID order
+    wm->layouts[0] = master_layout();
+    wm->layouts[1] = horizontal_layout();
+    wm->layouts[2] = monocle_layout();
 }

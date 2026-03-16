@@ -8,6 +8,18 @@ float mfactor = 0.5;
 int nmaster = 1;
 int ntiled = 0;
 
+Layout master_layout(){
+    return (Layout){.id = LAYOUT_MASTER, .tile = master_tile, .rotate = master_rotate, .focus = focus_direction};
+}
+
+Layout horizontal_layout(){
+    return (Layout){.id = LAYOUT_HORIZONTAL, .tile = horizontal_tile, .rotate = horizontal_rotate, .focus = focus_direction};
+}
+
+Layout monocle_layout(){
+    return (Layout){.id = LAYOUT_MONOCLE, .tile = monocle_tile, .rotate = monocle_rotate, .focus = monocle_focus};
+}
+
 void tile(WM *wm){
     ntiled = 0;
 
@@ -16,18 +28,7 @@ void tile(WM *wm){
             ntiled++;
     }
 
-    switch(wm->layout_mode){
-        case LAYOUT_HORIZONTAL:
-            horizontal_tile(wm);
-            break;
-        case LAYOUT_MASTER:
-            master_tile(wm);
-            break;
-
-        case LAYOUT_MONOCLE:
-            monocle_tile(wm);
-            break;
-    }
+    wm->layouts[wm->active_layout].tile(wm);
 }
 
 void horizontal_tile(WM *wm){
@@ -133,7 +134,7 @@ void monocle_tile(WM *wm){
 }
 
 void resize(WM *wm, const Arg *arg){
-    if(wm->layout_mode == LAYOUT_MONOCLE) return;
+    if(wm->layouts[wm->active_layout].id == LAYOUT_MONOCLE) return;
 
     int dir = arg->i;
     float change = 0;
@@ -172,18 +173,7 @@ void rotate(WM *wm, const Arg *arg){
     (void)arg;
     if(ntiled < 2) return;
 
-    switch(wm->layout_mode){
-        case LAYOUT_HORIZONTAL:
-            horizontal_rotate(wm);
-            break;
-
-        case LAYOUT_MASTER:
-            master_rotate(wm);
-            break;
-
-        case LAYOUT_MONOCLE:
-            break;
-    }
+    wm->layouts[wm->active_layout].rotate(wm);
 }
 
 void horizontal_rotate(WM *wm){
@@ -209,6 +199,10 @@ void master_rotate(WM *wm){
     //Cycle the enum
     master_pos = (master_pos+1) % 4;
     tile(wm);
+}
+
+void monocle_rotate(WM *wm){
+    (void)wm;
 }
 
 void parent_center(WM *wm, Window parent, Window child){

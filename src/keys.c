@@ -24,7 +24,8 @@ Key keys[] = {
     {XK_h, Mod1Mask | ControlMask, "resize_left"},
     {XK_k, Mod1Mask | ControlMask, "resize_up"},
     {XK_j, Mod1Mask | ControlMask, "resize_down"},
-    {XK_Return, Mod1Mask | ControlMask, "set_master"}
+    {XK_Return, Mod1Mask | ControlMask, "set_master"},
+    {XK_m, Mod1Mask, "switch_layout"}
 };
 
 void grab_key(Display *dpy, KeySym keysym, unsigned int mod){

@@ -41,13 +41,6 @@ int main(void)
     wm.sh = DisplayHeight(wm.dpy, screen);
     wm.root = DefaultRootWindow(wm.dpy);
 
-    wm.usable_height = wm.sh;
-    wm.usable_width = wm.sw;
-
-    wm.active_layout = LAYOUT_MONOCLE;
-
-    init_layouts(&wm);
-
     XSetErrorHandler(startup_handler);
 
     XSelectInput(wm.dpy, wm.root, SubstructureRedirectMask | 
@@ -65,6 +58,13 @@ int main(void)
 
     XSetErrorHandler(general_handler);
 
+    wm.usable_height = wm.sh;
+    wm.usable_width = wm.sw;
+
+    wm.active_layout = LAYOUT_MONOCLE;
+
+    init_layouts(&wm);
+
     //disables focus on hover
     XSetInputFocus(wm.dpy, None, RevertToParent, CurrentTime);
 
@@ -79,26 +79,11 @@ int main(void)
     Cursor cursor = XCreateFontCursor(wm.dpy, XC_left_ptr);
     XDefineCursor(wm.dpy, DefaultRootWindow(wm.dpy), cursor);
 
+    //Initialize atoms in the wm struct
     init_atoms(&wm);
 
-    Atom net_supported = XInternAtom(wm.dpy, "_NET_SUPPORTED", False);
-
-    Atom supported[] = {
-        wm.atoms.net_strut_partial,
-        wm.atoms.net_wm_win_type,
-        wm.atoms.net_wm_win_type_dock,
-        wm.atoms.net_wm_win_type_dialog,
-        wm.atoms.net_wm_win_type_menu
-    };
-
-    XChangeProperty(wm.dpy,
-            wm.root,
-            net_supported,
-            XA_ATOM,
-            32,
-            PropModeReplace,
-            (unsigned char *)supported,
-            3);
+    //Set the net supported property on root
+    initset_net_supported(&wm);
 
     XSync(wm.dpy, False);
 

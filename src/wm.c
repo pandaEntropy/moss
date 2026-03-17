@@ -43,6 +43,12 @@ void manage(WM *wm, Window w);
 
 void unmanage(WM *wm, Window win);
 
+void handle_client_msg(WM *wm, XClientMessageEvent *cm);
+
+void handle_net_active_window_msg(WM *wm, XClientMessageEvent *cm);
+
+void update_net_clients(WM *wm);
+
 bool subwin_unmapped = false;
 
 static Dock docks[4];
@@ -101,6 +107,10 @@ void handle_XEvent(WM *wm, XEvent *ev){
 
         case DestroyNotify:
             OnDestroyNotify(wm, &ev->xdestroywindow);
+            break;
+
+        case ClientMessage:
+            handle_client_msg(wm, &ev->xclient);
             break;
     }
 }
@@ -283,6 +293,8 @@ void manage(WM *wm, Window win){
         else screen_center(wm, win);
     }
 
+    update_net_clients(wm);
+
     focus(wm, c);
 
     if(!c->floating){
@@ -332,6 +344,8 @@ void unmanage(WM *wm, Window win){
     }
     wm->nclients--;
 
+    update_net_clients(wm);
+
     tile(wm);
     free(c); //free the removed client
 }
@@ -361,7 +375,7 @@ void focus(WM *wm, Client *c){
 
     XSetInputFocus(wm->dpy, c->win, RevertToParent, CurrentTime);
 
-    XChangeProperty(wm->dpy, wm->root, wm->atoms.net_active_window, XA_ATOM, 32, PropModeReplace, (unsigned char *)&c->win, 1);
+    XChangeProperty(wm->dpy, wm->root, wm->atoms.net_active_window, XA_WINDOW, 32, PropModeReplace, (unsigned char *)&c->win, 1);
 }
 
 void set_master(WM *wm, const Arg *arg){
@@ -540,6 +554,7 @@ void handle_dock(WM *wm, Window win){
     recalc_usable_area(wm);
 
     XMapWindow(wm->dpy, win);
+
     tile(wm);
 
     return;
@@ -587,6 +602,7 @@ void init_atoms(WM *wm){
     wm->atoms.net_wm_win_type_normal = XInternAtom(wm->dpy, "_NET_WM_WINDOW_TYPE_NORMAL", False);
 
     wm->atoms.net_active_window = XInternAtom(wm->dpy, "_NET_ACTIVE_WINDOW", False);
+    wm->atoms.net_client_list = XInternAtom(wm->dpy, "_NET_CLIENT_LIST", False);
 
     wm->atoms.wm_protocols = XInternAtom(wm->dpy, "WM_PROTOCOLS", False);
     wm->atoms.wm_delete_window = XInternAtom(wm->dpy, "WM_DELETE_WINDOW", False);
@@ -607,4 +623,78 @@ void init_layouts(WM *wm){
     wm->layouts[0] = master_layout();
     wm->layouts[1] = horizontal_layout();
     wm->layouts[2] = monocle_layout();
+}
+
+void switch_layout(WM *wm, const Arg *arg){
+    (void)arg;
+    wm->active_layout = (wm->active_layout+1) % 3;
+    tile(wm);
+}
+
+
+void handle_client_msg(WM *wm, XClientMessageEvent *cm){
+    if(cm->message_type == wm->atoms.net_active_window){
+        handle_net_active_window_msg(wm, cm);
+    }
+}
+
+void handle_net_active_window_msg(WM *wm, XClientMessageEvent *cm){
+    //If this is true, then this client is managed by this wm
+    Client *c = wintoclient(wm, cm->window);
+
+    if(!c)
+        return;
+
+    focus(wm, c);
+
+    XRaiseWindow(wm->dpy, c->win);
+}
+
+void update_net_clients(WM *wm){
+    Window net_clients[wm->nclients];
+
+    int i = 0;
+    for(Client *c = wm->clients; c; c = c->next){
+        net_clients[i] = c->win;
+        i++;
+    }
+
+    XChangeProperty(
+        wm->dpy,
+        wm->root,
+        wm->atoms.net_client_list,
+        XA_WINDOW,
+        32,
+        PropModeReplace,
+        (unsigned char *)net_clients,
+        wm->nclients
+    );
+}
+
+void initset_net_supported(WM *wm){
+    Atom net_supported = XInternAtom(wm->dpy, "_NET_SUPPORTED", False);
+
+    Atom supported[] = {
+        wm->atoms.net_strut_partial,
+        wm->atoms.net_wm_win_type,
+        wm->atoms.net_wm_win_type_dock,
+        wm->atoms.net_wm_win_type_dialog,
+        wm->atoms.net_wm_win_type_menu,
+        wm->atoms.net_wm_win_type_splash,
+        wm->atoms.net_wm_win_type_normal,
+        wm->atoms.net_active_window,
+        wm->atoms.net_client_list
+    };
+
+    int nsupp = sizeof(supported) / sizeof(supported[0]);
+
+    XChangeProperty(wm->dpy,
+            wm->root,
+            net_supported,
+            XA_ATOM,
+            32,
+            PropModeReplace,
+            (unsigned char *)supported,
+            nsupp
+    );
 }

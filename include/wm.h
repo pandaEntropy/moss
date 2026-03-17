@@ -61,6 +61,7 @@ typedef struct Atoms{
     Atom net_wm_win_type_normal;
 
     Atom net_active_window;
+    Atom net_client_list;
 
     Atom wm_protocols;
     Atom wm_take_focus;
@@ -118,5 +119,9 @@ void monocle_focus(WM *wm, int dir);
 void cmd_focus(WM *wm, const Arg *arg);
 
 void init_layouts(WM *wm);
+
+void switch_layout(WM *wm, const Arg *arg);
+
+void initset_net_supported(WM *wm);
 
 #endif

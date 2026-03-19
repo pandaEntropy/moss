@@ -4,3 +4,4 @@ main
 wmctl
 wmctl.c
 bar/bar
+*.d

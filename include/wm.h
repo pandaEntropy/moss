@@ -62,6 +62,10 @@ typedef struct Atoms{
 
     Atom net_active_window;
     Atom net_client_list;
+    Atom net_num_of_desktops;
+    Atom net_current_desktop;
+    Atom net_workarea;
+    Atom net_supp_wm_check;
 
     Atom wm_protocols;
     Atom wm_take_focus;
@@ -81,6 +85,10 @@ typedef struct WM{
     int nclients;
     int usable_height;
     int usable_width;
+
+    //first usable point from the origin
+    int usable_x; 
+    int usable_y;
 
     Atoms atoms;
 
@@ -123,5 +131,11 @@ void init_layouts(WM *wm);
 void switch_layout(WM *wm, const Arg *arg);
 
 void initset_net_supported(WM *wm);
+
+void update_net_num_of_desktops(WM *wm);
+
+void update_net_current_desktop(WM *wm);
+
+void set_net_supp_wm_check(WM *wm);
 
 #endif

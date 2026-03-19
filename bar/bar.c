@@ -56,7 +56,7 @@ int main()
     Window root = DefaultRootWindow(dpy);
     int screen = DefaultScreen(dpy);
     bar.bar_width = DisplayWidth(dpy, screen);
-    bar.bar_height = 60;
+    bar.bar_height = 40;
 
     bar.bar = XCreateSimpleWindow(dpy, 
             root,

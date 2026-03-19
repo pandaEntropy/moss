@@ -40,7 +40,7 @@ void horizontal_tile(WM *wm){
         int x = w * i;
         int y = 0;
 
-        XMoveResizeWindow(wm->dpy, c->win, x, y, w, h);
+        XMoveResizeWindow(wm->dpy, c->win, x + wm->usable_x, y + wm->usable_y, w, h);
         i++;
     }
 }
@@ -49,7 +49,7 @@ void master_tile(WM *wm){
     if(ntiled == 0 || !wm->master) return;
 
     if(ntiled <= nmaster){
-        XMoveResizeWindow(wm->dpy, wm->master->win, 0, 0, wm->usable_width, wm->usable_height);
+        XMoveResizeWindow(wm->dpy, wm->master->win, wm->usable_x, wm->usable_y, wm->usable_width, wm->usable_height);
         return;
     }
 
@@ -106,12 +106,12 @@ void master_tile(WM *wm){
             break;
     }
 
-    XMoveResizeWindow(wm->dpy, wm->master->win, mx, my, mw, mh);
+    XMoveResizeWindow(wm->dpy, wm->master->win, mx + wm->usable_x, my + wm->usable_y, mw, mh);
 
     for(Client *c = wm->clients; c; c = c->next){
         if(c == wm->master || c->floating) continue;
 
-        XMoveResizeWindow(wm->dpy, c->win, wx, wy, ww, wh);
+        XMoveResizeWindow(wm->dpy, c->win, wx + wm->usable_x, wy + wm->usable_y, ww, wh);
         if(master_pos == MASTER_TOP || master_pos == MASTER_BOTTOM)
             wx += ww;
         else
@@ -125,7 +125,7 @@ void monocle_tile(WM *wm){
     for(Client *c = wm->clients; c; c = c->next){
         if(c->floating) continue;
 
-        XMoveResizeWindow(wm->dpy, c->win, 0, 0, wm->usable_width, wm->usable_height);
+        XMoveResizeWindow(wm->dpy, c->win, wm->usable_x, wm->usable_y, wm->usable_width, wm->usable_height);
     }
 
     if(wm->focused)

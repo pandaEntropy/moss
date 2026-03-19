@@ -6,6 +6,7 @@
 #include <limits.h>
 #include <unistd.h>
 #include <stdlib.h>
+#include <string.h>
 #include <X11/Xatom.h>
 
 #include "wm.h"
@@ -23,13 +24,13 @@ typedef enum Wintype{
 
 Wintype classify_window(WM *wm, Window win);
 
-void handle_dock(WM *wm, Window win);
+void manage_dock(WM *wm, Window win);
 
 void recalc_usable_area(WM *wm);
 
 int get_strut(WM *wm, Dock *dock);
 
-int unmanage_dock(WM *wm, Window win);
+void unmanage_dock(WM *wm, Window win);
 
 void OnMapRequest(WM *wm, XMapRequestEvent *ev);
 
@@ -48,6 +49,8 @@ void handle_client_msg(WM *wm, XClientMessageEvent *cm);
 void handle_net_active_window_msg(WM *wm, XClientMessageEvent *cm);
 
 void update_net_clients(WM *wm);
+
+void update_net_workarea(WM *wm);
 
 bool subwin_unmapped = false;
 
@@ -248,7 +251,8 @@ void manage(WM *wm, Window win){
     Wintype type = classify_window(wm, win);
 
     if(type == WIN_DOCK){
-        handle_dock(wm, win);
+        manage_dock(wm, win);
+        update_net_workarea(wm);
         return;
     }
 
@@ -307,8 +311,11 @@ void manage(WM *wm, Window win){
 
 
 void unmanage(WM *wm, Window win){
-    if(unmanage_dock(wm, win)){
-        recalc_usable_area(wm);
+    Wintype type = classify_window(wm, win);
+
+    if(type == WIN_DOCK){
+        unmanage_dock(wm, win);
+        update_net_workarea(wm);
         tile(wm);
         return;
     }
@@ -407,6 +414,9 @@ int has_wintype(int nitems, Atom *atoms, Atom type){
 }
 
 int get_strut(WM *wm, Dock *dock){
+
+    // TODO Later add full support of the strut features
+
     Atom actual_type;
     int actual_format;
     unsigned long nitems, bytes_after;
@@ -445,17 +455,23 @@ int get_strut(WM *wm, Dock *dock){
 }
 
 void recalc_usable_area(WM *wm){
-    int occ_height, occ_width;
+    int left = 0, right = 0, bottom = 0, top = 0;
+
     for(int i = 0; i < ndocks; i++){
-        occ_height = docks[i].bottom + docks[i].top;
-        occ_width = docks[i].right + docks[i].left;
+        if(docks[i].left > left) left = docks[i].left;
+        if(docks[i].right > right) right = docks[i].right;
+        if(docks[i].bottom > bottom)  bottom = docks[i].bottom;
+        if(docks[i].top > top) top = docks[i].top;
     }
 
-    wm->usable_height = wm->sh - occ_height;
-    wm->usable_width = wm->sw - occ_width;
+    wm->usable_height = wm->sh - top - bottom;
+    wm->usable_width = wm->sw - right - left;
+
+    wm->usable_x = left;
+    wm->usable_y = top;
 }
 
-int unmanage_dock(WM *wm, Window win){
+void unmanage_dock(WM *wm, Window win){
     (void)wm;
     int idx = -1;
 
@@ -465,14 +481,14 @@ int unmanage_dock(WM *wm, Window win){
             break;
         }
     }
-    if(idx == -1) return 0;
+    if(idx == -1) return;
 
     for(int i = idx; i < ndocks-1; i++){
         docks[i] = docks[i + 1];
     }
 
     ndocks--;
-    return 1;
+    recalc_usable_area(wm);
 }
 
 Client* get_client(WM *wm, Window win){
@@ -545,7 +561,7 @@ cleanup:
     return type;
 }
 
-void handle_dock(WM *wm, Window win){
+void manage_dock(WM *wm, Window win){
     Dock *dock = &docks[ndocks];
     ndocks++;
     dock->win = win;
@@ -603,6 +619,10 @@ void init_atoms(WM *wm){
 
     wm->atoms.net_active_window = XInternAtom(wm->dpy, "_NET_ACTIVE_WINDOW", False);
     wm->atoms.net_client_list = XInternAtom(wm->dpy, "_NET_CLIENT_LIST", False);
+    wm->atoms.net_num_of_desktops = XInternAtom(wm->dpy, "_NET_NUMBER_OF_DESKTOPS", False);
+    wm->atoms.net_current_desktop = XInternAtom(wm->dpy, "_NET_CURRENT_DESKTOP", False);
+    wm->atoms.net_workarea = XInternAtom(wm->dpy, "_NET_WORKAREA", False);
+    wm->atoms.net_supp_wm_check = XInternAtom(wm->dpy, "_NET_SUPPORTING_WM_CHECK", False);
 
     wm->atoms.wm_protocols = XInternAtom(wm->dpy, "WM_PROTOCOLS", False);
     wm->atoms.wm_delete_window = XInternAtom(wm->dpy, "WM_DELETE_WINDOW", False);
@@ -654,7 +674,7 @@ void update_net_clients(WM *wm){
     Window net_clients[wm->nclients];
 
     int i = 0;
-    for(Client *c = wm->clients; c; c = c->next){
+    for(Client *c = last_client(wm); c; c = c->prev){
         net_clients[i] = c->win;
         i++;
     }
@@ -683,7 +703,11 @@ void initset_net_supported(WM *wm){
         wm->atoms.net_wm_win_type_splash,
         wm->atoms.net_wm_win_type_normal,
         wm->atoms.net_active_window,
-        wm->atoms.net_client_list
+        wm->atoms.net_client_list,
+        wm->atoms.net_num_of_desktops,
+        wm->atoms.net_current_desktop,
+        wm->atoms.net_workarea,
+        wm->atoms.net_supp_wm_check
     };
 
     int nsupp = sizeof(supported) / sizeof(supported[0]);
@@ -696,5 +720,93 @@ void initset_net_supported(WM *wm){
             PropModeReplace,
             (unsigned char *)supported,
             nsupp
+    );
+}
+
+void update_net_num_of_desktops(WM *wm){
+    //Currently unfinished since I don't have virtual desktops yet
+    long n = 1;
+
+    XChangeProperty(
+        wm->dpy,
+        wm->root,
+        wm->atoms.net_num_of_desktops,
+        XA_CARDINAL,
+        32,
+        PropModeReplace,
+        (unsigned char *)&n,
+        1
+    );
+}
+
+void update_net_current_desktop(WM *wm){
+    //Temporary. Don't forget to finish this after finishing desktops
+    long n = 0;
+
+    XChangeProperty(
+        wm->dpy,
+        wm->root,
+        wm->atoms.net_current_desktop,
+        XA_CARDINAL,
+        32,
+        PropModeReplace,
+        (unsigned char *)&n,
+        1
+    );
+}
+
+void update_net_workarea(WM *wm){
+    long workarea[] = {wm->usable_x, wm->usable_y, wm->usable_width, wm->usable_height};
+
+    XChangeProperty(
+        wm->dpy,
+        wm->root,
+        wm->atoms.net_workarea,
+        XA_CARDINAL,
+        32,
+        PropModeReplace,
+        (unsigned char *)&workarea,
+        4
+    );
+}
+
+void set_net_supp_wm_check(WM *wm){
+    Window check_win = XCreateSimpleWindow(wm->dpy, wm->root, 0, 0, 1, 1, 0, 0, 0);
+
+    Atom net_wm_name = XInternAtom(wm->dpy, "_NET_WM_NAME", False);
+    Atom utf8 = XInternAtom(wm->dpy, "UTF8_STRING", False);
+     const char *name = "moss";
+
+    XChangeProperty(
+        wm->dpy,
+        wm->root,
+        wm->atoms.net_supp_wm_check,
+        XA_WINDOW,
+        32,
+        PropModeReplace,
+        (unsigned char *)&check_win,
+        1
+    );
+
+    XChangeProperty(
+        wm->dpy,
+        check_win,
+        wm->atoms.net_supp_wm_check,
+        XA_WINDOW,
+        32,
+        PropModeReplace,
+        (unsigned char *)&check_win,
+        1
+    );
+
+    XChangeProperty(
+        wm->dpy,
+        check_win,
+        net_wm_name,
+        utf8,
+        8,
+        PropModeReplace,
+        (unsigned char *)name,
+        strlen(name)
     );
 }

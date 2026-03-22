@@ -52,6 +52,14 @@ void update_net_clients(WM *wm);
 
 void update_net_workarea(WM *wm);
 
+void reparent(WM *wm, Client *c);
+
+void unparent(WM *wm, Client *c);
+
+void kill_client(WM *wm, Client *c);
+
+void handle_buttonpress(WM *wm, XButtonEvent *ev);
+
 bool subwin_unmapped = false;
 
 static Dock docks[4];
@@ -88,6 +96,10 @@ void OnKeyPress(WM *wm, XKeyEvent *ev){
     handle_keypress(wm, ev);
 }
 
+void OnButtonPress(WM *wm, XButtonEvent *ev){
+    handle_buttonpress(wm, ev);
+}
+
 void handle_XEvent(WM *wm, XEvent *ev){
     switch(ev->type){
         case KeyPress:
@@ -95,9 +107,7 @@ void handle_XEvent(WM *wm, XEvent *ev){
             break;
 
         case ButtonPress:
-            if(ev->xbutton.subwindow != None){
-                focus(wm, wintoclient(wm, ev->xbutton.subwindow));
-            }
+            OnButtonPress(wm, &ev->xbutton);    
             break;
 
         case ConfigureRequest:
@@ -121,8 +131,9 @@ void handle_XEvent(WM *wm, XEvent *ev){
 void cmd_focus(WM *wm, const Arg *arg){
     wm->layouts[wm->active_layout].focus(wm, arg->i);
 
-    if(wm->layouts[wm->active_layout].id == LAYOUT_MONOCLE) 
+    if(wm->layouts[wm->active_layout].id == LAYOUT_MONOCLE){
         tile(wm);
+    }
 }
 
 void focus_direction(WM *wm, int dir) {
@@ -132,7 +143,7 @@ void focus_direction(WM *wm, int dir) {
     int bestdist = INT_MAX;
 
     XWindowAttributes fa;
-    XGetWindowAttributes(wm->dpy, wm->focused->win, &fa);
+    XGetWindowAttributes(wm->dpy, wm->focused->parent, &fa);
 
     //get the center of the focused window
     int fx = fa.x + fa.width / 2;
@@ -142,7 +153,7 @@ void focus_direction(WM *wm, int dir) {
         if (c == wm->focused) continue;
 
         XWindowAttributes wa;
-        XGetWindowAttributes(wm->dpy, c->win, &wa);
+        XGetWindowAttributes(wm->dpy, c->parent, &wa);
 
         //get the center of the window that we are comparing
         int wx = wa.x + wa.width / 2;
@@ -207,7 +218,7 @@ void monocle_focus(WM *wm, int dir){
         else
             focus(wm, last_client(wm));
 
-    } 
+    }
 }
 
 void unmap(WM *wm, const Arg *arg){
@@ -215,36 +226,47 @@ void unmap(WM *wm, const Arg *arg){
     if(wm->nclients < 1) return;
 
     if(subwin_unmapped == false){
+        XSetInputFocus(wm->dpy, wm->root, RevertToNone, CurrentTime);
+        Window win = None;
+        XChangeProperty(wm->dpy, wm->root, wm->atoms.net_active_window, XA_WINDOW, 32, PropModeReplace, (unsigned char *)&win, 1);
         XUnmapSubwindows(wm->dpy, wm->root);
         subwin_unmapped = true;
     }
     else{
         XMapSubwindows(wm->dpy, wm->root);
+        focus(wm, wm->focused); // to revert focus on X state and update net active window
         subwin_unmapped = false;
     }
 }
 
-void kill_window(WM *wm, const Arg *arg){
+void cmd_kill(WM *wm, const Arg *arg){
     (void)arg;
+
     if(!wm->focused) return;
 
-    //later add a Client param to call kill on clients other than focused
-    if(wm->focused->protocols & PROTO_DELETE){
+    kill_client(wm, wm->focused);
+}
+
+void kill_client(WM *wm, Client *c){
+    if(!c) return;
+
+    if(c->protocols & PROTO_DELETE){
         XEvent ev = {0};
         ev.type = ClientMessage;
-        ev.xclient.window = wm->focused->win;
+        ev.xclient.window = c->win;
         ev.xclient.message_type = wm->atoms.wm_protocols;
         ev.xclient.format = 32;
         // l type because format is 32 bits
         ev.xclient.data.l[0] = wm->atoms.wm_delete_window;
         ev.xclient.data.l[1] = CurrentTime;
 
-        XSendEvent(wm->dpy, wm->focused->win, False, NoEventMask, &ev);
+        XSendEvent(wm->dpy, c->win, False, NoEventMask, &ev);
         return;
     }
-
-    //If client is not ICCCM compliant
-    XKillClient(wm->dpy, wm->focused->win);
+    else{
+        //If client is not compliant
+        XKillClient(wm->dpy, c->win);
+    }
 }
 
 void manage(WM *wm, Window win){
@@ -253,6 +275,7 @@ void manage(WM *wm, Window win){
     if(type == WIN_DOCK){
         manage_dock(wm, win);
         update_net_workarea(wm);
+        tile(wm);
         return;
     }
 
@@ -289,17 +312,18 @@ void manage(WM *wm, Window win){
             break;
     }
 
-    XMapWindow(wm->dpy, win);
-
     if(c->floating){
         Window parent = get_transient(wm, win);
-        if(parent) parent_center(wm, parent, win);
-        else screen_center(wm, win);
+        if(parent) parent_center(wm, parent, c);
+        else screen_center(wm, c);
     }
 
     update_net_clients(wm);
 
-    focus(wm, c);
+    if(!c->floating) 
+        reparent(wm, c);
+
+    XAddToSaveSet(wm->dpy, c->win);
 
     if(!c->floating){
         if(wm->nclients == 1)
@@ -307,6 +331,11 @@ void manage(WM *wm, Window win){
 
         tile(wm);
     }
+
+    XMapWindow(wm->dpy, c->parent);
+    XMapWindow(wm->dpy, c->win);
+
+    focus(wm, c);
 }
 
 
@@ -320,7 +349,7 @@ void unmanage(WM *wm, Window win){
         return;
     }
 
-    Client *c = wintoclient(wm, win);
+    Client *c = win_in_clients(wm, win);
     if(!c) return;
 
     bool was_master = (c == wm->master);
@@ -351,14 +380,19 @@ void unmanage(WM *wm, Window win){
     }
     wm->nclients--;
 
+    if(wm->nclients < 1)
+        XSetInputFocus(wm->dpy, wm->root, RevertToNone, CurrentTime);
+
     update_net_clients(wm);
+
+    unparent(wm, c);
 
     tile(wm);
     free(c); //free the removed client
 }
 
 void focus(WM *wm, Client *c){
-    if(!c || wm->focused == c) return;
+    if(!c) return;
 
     wm->focused = c;
 
@@ -392,7 +426,7 @@ void set_master(WM *wm, const Arg *arg){
     tile(wm);
 }
 
-Client* wintoclient(WM *wm, Window win){
+Client* win_in_clients(WM *wm, Window win){
     for(Client *c = wm->clients; c; c = c->next){
         if(c->win == win){
             return c;
@@ -571,8 +605,6 @@ void manage_dock(WM *wm, Window win){
 
     XMapWindow(wm->dpy, win);
 
-    tile(wm);
-
     return;
 }
 
@@ -660,7 +692,7 @@ void handle_client_msg(WM *wm, XClientMessageEvent *cm){
 
 void handle_net_active_window_msg(WM *wm, XClientMessageEvent *cm){
     //If this is true, then this client is managed by this wm
-    Client *c = wintoclient(wm, cm->window);
+    Client *c = win_in_clients(wm, cm->window);
 
     if(!c)
         return;
@@ -809,4 +841,64 @@ void set_net_supp_wm_check(WM *wm){
         (unsigned char *)name,
         strlen(name)
     );
+}
+
+void reparent(WM *wm, Client *c){
+    if(c->floating) return;
+
+    XWindowAttributes ca;
+    XGetWindowAttributes(wm->dpy, c->win, &ca);
+
+    int borderwidth = 2; //temporary
+
+    Window parent = XCreateSimpleWindow(
+        wm->dpy,
+        wm->root,
+        0, 0,
+        ca.width + 2*borderwidth, 
+        ca.height + 2*borderwidth,
+        0,
+        0,
+        0
+    );
+
+    XReparentWindow(wm->dpy, c->win, parent, 0, 0);
+    c->parent = parent;
+
+    XGrabButton(
+            wm->dpy,
+            Button1,
+            0,
+            c->parent,
+            False,
+            ButtonPressMask,
+            GrabModeSync,
+            GrabModeAsync,
+            None,
+            None);
+
+    XSelectInput(wm->dpy, c->win, StructureNotifyMask);
+}
+
+void unparent(WM *wm, Client *c){
+    if(!c->parent || c->floating) return;
+
+    XDestroyWindow(wm->dpy, c->parent);
+}
+
+void handle_buttonpress(WM *wm, XButtonEvent *ev){
+    //subwindow bc grabs are done on the frame, not the client
+    Window win = ev->subwindow;
+    Client *c = win_in_clients(wm, win);
+
+    if(!c){
+        XAllowEvents(wm->dpy, ReplayPointer, CurrentTime);
+        return;
+    }
+
+    focus(wm, c);
+
+    XAllowEvents(wm->dpy, ReplayPointer, CurrentTime);
+
+    XSync(wm->dpy, False);
 }

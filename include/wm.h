@@ -15,6 +15,7 @@ typedef struct Client{
     struct Client *prev;
     bool floating;
     unsigned int protocols;
+    Window parent;
 }Client;
 
 typedef struct Dock{
@@ -104,11 +105,11 @@ void focus_direction(WM *wm, int dir);
 
 void unmap(WM *wm, const Arg *arg);
 
-void kill_window(WM *wm, const Arg *arg);
+void cmd_kill(WM *wm, const Arg *arg);
 
 void set_master(WM *wm, const Arg *arg);
 
-Client* wintoclient(WM *wm, Window win);
+Client *win_in_clients(WM *wm, Window win);
 
 int has_wintype(int nitems, Atom *atoms, Atom type);
 

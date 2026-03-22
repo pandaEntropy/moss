@@ -2,11 +2,17 @@
 #include "layout.h"
 
 #include <X11/Xlib.h>
+#include <stdio.h>
 
 MasterPosition master_pos = MASTER_LEFT;
 float mfactor = 0.5;
 int nmaster = 1;
 int ntiled = 0;
+
+
+void mvresize_window(WM *wm, Client *c, unsigned int width, unsigned int height, int x, int y);
+
+void move_window(WM *wm, Client *c, int x, int y);
 
 Layout master_layout(){
     return (Layout){.id = LAYOUT_MASTER, .tile = master_tile, .rotate = master_rotate, .focus = focus_direction};
@@ -40,7 +46,7 @@ void horizontal_tile(WM *wm){
         int x = w * i;
         int y = 0;
 
-        XMoveResizeWindow(wm->dpy, c->win, x + wm->usable_x, y + wm->usable_y, w, h);
+        mvresize_window(wm, c, w, h, x + wm->usable_x, y + wm->usable_y);
         i++;
     }
 }
@@ -49,7 +55,7 @@ void master_tile(WM *wm){
     if(ntiled == 0 || !wm->master) return;
 
     if(ntiled <= nmaster){
-        XMoveResizeWindow(wm->dpy, wm->master->win, wm->usable_x, wm->usable_y, wm->usable_width, wm->usable_height);
+        mvresize_window(wm, wm->master, wm->usable_width, wm->usable_height, wm->usable_x, wm->usable_y);
         return;
     }
 
@@ -106,12 +112,15 @@ void master_tile(WM *wm){
             break;
     }
 
-    XMoveResizeWindow(wm->dpy, wm->master->win, mx + wm->usable_x, my + wm->usable_y, mw, mh);
+    mvresize_window(wm, wm->master, mw, mh, mx + wm->usable_x, my + wm->usable_y);
 
     for(Client *c = wm->clients; c; c = c->next){
         if(c == wm->master || c->floating) continue;
 
-        XMoveResizeWindow(wm->dpy, c->win, wx + wm->usable_x, wy + wm->usable_y, ww, wh);
+        if(!c->parent)
+            printf("client has no parent\n");
+
+        mvresize_window(wm, c, ww, wh, wx + wm->usable_x, wy + wm->usable_y);
         if(master_pos == MASTER_TOP || master_pos == MASTER_BOTTOM)
             wx += ww;
         else
@@ -125,12 +134,13 @@ void monocle_tile(WM *wm){
     for(Client *c = wm->clients; c; c = c->next){
         if(c->floating) continue;
 
-        XMoveResizeWindow(wm->dpy, c->win, wm->usable_x, wm->usable_y, wm->usable_width, wm->usable_height);
+        mvresize_window(wm, c, wm->usable_width, wm->usable_height, wm->usable_x, wm->usable_y);
     }
 
-    if(wm->focused)
-        XMapRaised(wm->dpy, wm->focused->win);
-
+    if(wm->focused){
+        XRaiseWindow(wm->dpy, wm->focused->parent);
+        XRaiseWindow(wm->dpy, wm->focused->win);
+    }
 }
 
 void resize(WM *wm, const Arg *arg){
@@ -180,18 +190,18 @@ void horizontal_rotate(WM *wm){
     if(!wm->clients) return;
 
     XWindowAttributes first_attr;
-    XGetWindowAttributes(wm->dpy, wm->clients->win, &first_attr);
+    XGetWindowAttributes(wm->dpy, wm->clients->parent, &first_attr);
 
     for(Client *c = wm->clients; c; c = c->next){
         if(c->next == NULL){
-            XMoveWindow(wm->dpy, c->win, first_attr.x, first_attr.y);
+            move_window(wm, c, first_attr.x, first_attr.y);
             break;  
         }
 
         XWindowAttributes next_attr;
-        XGetWindowAttributes(wm->dpy, c->next->win, &next_attr);
+        XGetWindowAttributes(wm->dpy, c->next->parent, &next_attr);
 
-        XMoveWindow(wm->dpy, c->win, next_attr.x, next_attr.y);  
+        move_window(wm, c, next_attr.x, next_attr.y);
     }
 }
 
@@ -205,12 +215,12 @@ void monocle_rotate(WM *wm){
     (void)wm;
 }
 
-void parent_center(WM *wm, Window parent, Window child){
+void parent_center(WM *wm, Window parent, Client *c){
     XWindowAttributes pattr;
     XWindowAttributes cattr;
 
     XGetWindowAttributes(wm->dpy, parent, &pattr);
-    XGetWindowAttributes(wm->dpy, child, &cattr);
+    XGetWindowAttributes(wm->dpy, c->win, &cattr);
 
     int x = pattr.x + (pattr.width - cattr.width) / 2;
     int y = pattr.y + (pattr.height - cattr.height) / 2;
@@ -218,13 +228,13 @@ void parent_center(WM *wm, Window parent, Window child){
     if(x < 0) x = 0;
     if(y < 0) y = 0;
 
-    XMoveWindow(wm->dpy, child, x, y);
+    move_window(wm, c, x, y);
 }
 
-void screen_center(WM *wm, Window child){
+void screen_center(WM *wm, Client *c){
     XWindowAttributes cattr;
 
-    XGetWindowAttributes(wm->dpy, child, &cattr);
+    XGetWindowAttributes(wm->dpy, c->win, &cattr);
 
     int x = (wm->usable_width - cattr.width) / 2;
     int y = (wm->usable_height - cattr.height) / 2;
@@ -232,6 +242,15 @@ void screen_center(WM *wm, Window child){
     if(x < 0) x = 0;
     if(y < 0) y = 0;
 
-    XMoveWindow(wm->dpy, child, x, y);
+    move_window(wm, c, x, y);
 }
 
+void mvresize_window(WM *wm, Client *c, unsigned int width, unsigned int height, int x, int y){
+    XMoveResizeWindow(wm->dpy, c->parent, x, y, width, height);
+    XMoveResizeWindow(wm->dpy, c->win, 2, 2, width - 2*2, height - 2*2); // TODO Numbers are temporary, fix after adding global borders
+}
+
+void move_window(WM *wm, Client *c, int x, int y){
+    XMoveWindow(wm->dpy, c->parent, x, y);
+    XMoveWindow(wm->dpy, c->win, 2, 2); // TODO change borders here as well
+}

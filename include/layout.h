@@ -35,8 +35,8 @@ void horizontal_rotate(WM *wm);
 
 void resize(WM *wm, const Arg *arg);
 
-void parent_center(WM *wm, Window parent, Window child);
+void parent_center(WM *wm, Window parent, Client *c);
 
-void screen_center(WM *wm, Window child);
+void screen_center(WM *wm, Client *c);
 
 #endif

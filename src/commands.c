@@ -31,7 +31,7 @@ Command commands[] = {
     {"focus_left", cmd_focus, {.i = DIR_LEFT}},
     {"focus_down", cmd_focus, {.i = DIR_DOWN}},
     {"focus_up", cmd_focus, {.i = DIR_UP}},
-    {"kill", kill_window, {0}},
+    {"kill", cmd_kill, {0}},
     {"spawn", spawn, {.cparr = termcmd}},
     {"set_master", set_master, {0}},
     {"rotate", rotate, {0}},

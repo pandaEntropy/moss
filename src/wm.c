@@ -2,7 +2,7 @@
 #include <X11/keysym.h>
 #include <stdbool.h>
 #include <X11/cursorfont.h>
-#include <stdio.h>
+#include <stdio.h> 
 #include <limits.h>
 #include <unistd.h>
 #include <stdlib.h>
@@ -62,6 +62,11 @@ void handle_buttonpress(WM *wm, XButtonEvent *ev);
 
 bool subwin_unmapped = false;
 
+unsigned long active_color = 0x3399FF;
+
+unsigned long inactive_color = 0x444444;
+
+
 static Dock docks[4];
 static int ndocks = 0;
 
@@ -81,7 +86,7 @@ void OnConfigureRequest(WM *wm, XConfigureRequestEvent* ev){
     changes.y = ev->y;
     changes.width = ev->width;
     changes.height = ev->height;
-    changes.border_width = ev->border_width;
+    changes.border_width = 0;
     changes.sibling = ev->above;
     changes.stack_mode = ev->detail;
 
@@ -293,23 +298,8 @@ void manage(WM *wm, Window win){
 
     set_protocols(wm, c);
 
-    switch(type){
-        case WIN_DIALOG:
-            c->floating = true;
-            break;
-
-        case WIN_SPLASH:
-            c->floating = true;
-            break;
-
-        case WIN_MENU:
-            c->floating = true;
-            break;
-
-        case WIN_DOCK:
-        case WIN_NORMAL:
-        default:
-            break;
+    if(type == WIN_DIALOG || type == WIN_SPLASH || type == WIN_MENU){
+        c->floating = true;
     }
 
     if(c->floating){
@@ -336,8 +326,12 @@ void manage(WM *wm, Window win){
     XMapWindow(wm->dpy, c->win);
 
     focus(wm, c);
-}
 
+    if(wm->active_layout == LAYOUT_MONOCLE){
+        XRaiseWindow(wm->dpy, wm->focused->parent);
+        XRaiseWindow(wm->dpy, wm->focused->win);
+    }
+}
 
 void unmanage(WM *wm, Window win){
     Wintype type = classify_window(wm, win);
@@ -394,6 +388,9 @@ void unmanage(WM *wm, Window win){
 void focus(WM *wm, Client *c){
     if(!c) return;
 
+    if(wm->focused)
+        XSetWindowBorder(wm->dpy, wm->focused->parent, inactive_color);
+
     wm->focused = c;
 
     if(c->protocols & PROTO_TAKE_FOCUS){
@@ -417,6 +414,8 @@ void focus(WM *wm, Client *c){
     XSetInputFocus(wm->dpy, c->win, RevertToParent, CurrentTime);
 
     XChangeProperty(wm->dpy, wm->root, wm->atoms.net_active_window, XA_WINDOW, 32, PropModeReplace, (unsigned char *)&c->win, 1);
+
+    XSetWindowBorder(wm->dpy, wm->focused->parent, active_color);
 }
 
 void set_master(WM *wm, const Arg *arg){
@@ -691,7 +690,6 @@ void handle_client_msg(WM *wm, XClientMessageEvent *cm){
 }
 
 void handle_net_active_window_msg(WM *wm, XClientMessageEvent *cm){
-    //If this is true, then this client is managed by this wm
     Client *c = win_in_clients(wm, cm->window);
 
     if(!c)
@@ -849,18 +847,21 @@ void reparent(WM *wm, Client *c){
     XWindowAttributes ca;
     XGetWindowAttributes(wm->dpy, c->win, &ca);
 
-    int borderwidth = 2; //temporary
+    XSetWindowAttributes attrs;
+    attrs.override_redirect = True;
 
-    Window parent = XCreateSimpleWindow(
+    Window parent = XCreateWindow(
         wm->dpy,
         wm->root,
         0, 0,
-        ca.width + 2*borderwidth, 
-        ca.height + 2*borderwidth,
-        0,
-        0,
-        0
-    );
+        ca.width, 
+        ca.height,
+        border_width,
+        CopyFromParent,
+        InputOutput,
+        CopyFromParent,
+        CWOverrideRedirect,
+        &attrs);
 
     XReparentWindow(wm->dpy, c->win, parent, 0, 0);
     c->parent = parent;
@@ -901,4 +902,24 @@ void handle_buttonpress(WM *wm, XButtonEvent *ev){
     XAllowEvents(wm->dpy, ReplayPointer, CurrentTime);
 
     XSync(wm->dpy, False);
+}
+
+void send_conf_req(WM *wm, Client *c, int width, int height, int x, int y){
+    XConfigureEvent ev;
+
+    ev.type = ConfigureNotify;
+    ev.display = wm->dpy;
+    ev.event = c->win;
+    ev.window = c->win;
+
+    ev.width = width;
+    ev.height = height;
+    ev.x = x;
+    ev.y = y;
+
+    ev.border_width = 0;
+    ev.above = None;
+    ev.override_redirect = False;
+
+    XSendEvent(wm->dpy, c->win, False, StructureNotifyMask, (XEvent *)&ev);
 }

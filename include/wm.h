@@ -139,4 +139,6 @@ void update_net_current_desktop(WM *wm);
 
 void set_net_supp_wm_check(WM *wm);
 
+void send_conf_req(WM *wm, Client *c, int width, int height, int x, int y);
+
 #endif

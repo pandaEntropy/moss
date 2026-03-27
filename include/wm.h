@@ -24,6 +24,14 @@ typedef struct Dock{
     int right;
     int top;
     int bottom;
+    int left_start_y;
+    int left_end_y;
+    int right_start_y;
+    int right_end_y;
+    int top_start_x;
+    int top_end_x;
+    int bottom_start_x;
+    int bottom_end_x;
 }Dock;
 
 typedef struct Arg{
@@ -54,7 +62,8 @@ typedef struct Layout{
 typedef struct Atoms{
     Atom net_wm_win_type;
     Atom net_wm_win_type_dock;
-    Atom net_strut_partial;
+    Atom net_wm_strut_partial;
+    Atom net_wm_strut;
 
     Atom net_wm_win_type_dialog;
     Atom net_wm_win_type_menu;

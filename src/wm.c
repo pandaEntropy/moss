@@ -14,6 +14,8 @@
 #include "keys.h"
 #include "forward.h"
 
+#define MAX_DOCKS 8
+
 typedef enum Wintype{
     WIN_DIALOG,
     WIN_SPLASH,
@@ -28,7 +30,9 @@ void manage_dock(WM *wm, Window win);
 
 void recalc_usable_area(WM *wm);
 
-int get_strut(WM *wm, Dock *dock);
+bool get_strut_partial(WM *wm, Dock *dock);
+
+bool get_strut(WM *wm, Dock *dock);
 
 void unmanage_dock(WM *wm, Window win);
 
@@ -39,6 +43,8 @@ void OnConfigureRequest(WM *wm, XConfigureRequestEvent *ev);
 void OnKeyPress(WM *wm, XKeyEvent *ev);
 
 void OnDestroyNotify(WM *wm, XDestroyWindowEvent *ev);
+
+void OnPropertyNotify(WM *wm, XPropertyEvent *ev);
 
 void manage(WM *wm, Window w);
 
@@ -59,6 +65,12 @@ void unparent(WM *wm, Client *c);
 void kill_client(WM *wm, Client *c);
 
 void handle_buttonpress(WM *wm, XButtonEvent *ev);
+
+void handle_property_notify(WM *wm, XPropertyEvent *ev);
+
+bool get_any_strut(WM *wm, Dock *dock);
+
+Dock *win_in_docks(Window win);
 
 bool subwin_unmapped = false;
 
@@ -105,6 +117,10 @@ void OnButtonPress(WM *wm, XButtonEvent *ev){
     handle_buttonpress(wm, ev);
 }
 
+void OnPropertyNotify(WM *wm, XPropertyEvent *ev){
+    handle_property_notify(wm, ev);
+}
+
 void handle_XEvent(WM *wm, XEvent *ev){
     switch(ev->type){
         case KeyPress:
@@ -129,6 +145,10 @@ void handle_XEvent(WM *wm, XEvent *ev){
 
         case ClientMessage:
             handle_client_msg(wm, &ev->xclient);
+            break;
+
+        case PropertyNotify:
+            OnPropertyNotify(wm, &ev->xproperty);
             break;
     }
 }
@@ -446,10 +466,7 @@ int has_wintype(int nitems, Atom *atoms, Atom type){
     return res;
 }
 
-int get_strut(WM *wm, Dock *dock){
-
-    // TODO Later add full support of the strut features
-
+bool get_strut_partial(WM *wm, Dock *dock){
     Atom actual_type;
     int actual_format;
     unsigned long nitems, bytes_after;
@@ -458,7 +475,7 @@ int get_strut(WM *wm, Dock *dock){
     if(XGetWindowProperty(
                 wm->dpy,
                 dock->win,
-                wm->atoms.net_strut_partial,
+                wm->atoms.net_wm_strut_partial,
                 0,
                 12,
                 False,
@@ -468,12 +485,58 @@ int get_strut(WM *wm, Dock *dock){
                 &nitems,
                 &bytes_after,
                 &data)!= Success)
-        return 0;
+        return false;
+
+    if(!data || nitems < 12){
+        if(data)
+            XFree(data);
+        return false;
+    }
+
+    long *strut = (long *)data;
+
+    dock->left = strut[0];
+    dock->right = strut[1];
+    dock->top = strut[2];
+    dock->bottom = strut[3];
+    dock->left_start_y = strut[4];
+    dock->left_end_y = strut[5];
+    dock->right_start_y = strut[6];
+    dock->right_end_y = strut[7];
+    dock->top_start_x = strut[8];
+    dock->top_end_x = strut[9];
+    dock->bottom_start_x = strut[10];
+    dock->bottom_end_x =strut[11];
+
+    XFree(data);
+    return true;
+}
+
+bool get_strut(WM *wm, Dock *dock){
+    Atom actual_type;
+    int actual_format;
+    unsigned long nitems, bytes_after;
+    unsigned char *data = NULL;
+
+    if(XGetWindowProperty(
+                wm->dpy,
+                dock->win,
+                wm->atoms.net_wm_strut,
+                0,
+                4,
+                False,
+                XA_CARDINAL,
+                &actual_type,
+                &actual_format,
+                &nitems,
+                &bytes_after,
+                &data)!= Success)
+        return false;
 
     if(!data || nitems < 4){
         if(data)
             XFree(data);
-        return 0;
+        return false;
     }
 
     long *strut = (long *)data;
@@ -484,7 +547,7 @@ int get_strut(WM *wm, Dock *dock){
     dock->bottom = strut[3];
 
     XFree(data);
-    return 1;
+    return true;
 }
 
 void recalc_usable_area(WM *wm){
@@ -595,11 +658,20 @@ cleanup:
 }
 
 void manage_dock(WM *wm, Window win){
+    if(ndocks == MAX_DOCKS)
+        return;
+
     Dock *dock = &docks[ndocks];
-    ndocks++;
+    *dock = (Dock){0};
     dock->win = win;
 
-    get_strut(wm, dock);
+    if(!get_any_strut(wm, dock)){
+        printf("Failed to acquire strut parameters\n");
+        return;
+    }
+
+    ndocks++;
+
     recalc_usable_area(wm);
 
     XMapWindow(wm->dpy, win);
@@ -641,7 +713,8 @@ void set_protocols(WM *wm, Client *c){
 void init_atoms(WM *wm){
     wm->atoms.net_wm_win_type = XInternAtom(wm->dpy, "_NET_WM_WINDOW_TYPE", False);
     wm->atoms.net_wm_win_type_dock = XInternAtom(wm->dpy, "_NET_WM_WINDOW_TYPE_DOCK", False);
-    wm->atoms.net_strut_partial = XInternAtom(wm->dpy, "_NET_WM_STRUT_PARTIAL", False);
+    wm->atoms.net_wm_strut_partial = XInternAtom(wm->dpy, "_NET_WM_STRUT_PARTIAL", False);
+    wm->atoms.net_wm_strut = XInternAtom(wm->dpy, "_NET_WM_STRUT", False);
 
     wm->atoms.net_wm_win_type_dialog = XInternAtom(wm->dpy, "_NET_WM_WINDOW_TYPE_DIALOG", False);
     wm->atoms.net_wm_win_type_menu = XInternAtom(wm->dpy, "_NET_WM_WINDOW_TYPE_MENU", False);
@@ -725,7 +798,8 @@ void initset_net_supported(WM *wm){
     Atom net_supported = XInternAtom(wm->dpy, "_NET_SUPPORTED", False);
 
     Atom supported[] = {
-        wm->atoms.net_strut_partial,
+        wm->atoms.net_wm_strut_partial,
+        wm->atoms.net_wm_strut,
         wm->atoms.net_wm_win_type,
         wm->atoms.net_wm_win_type_dock,
         wm->atoms.net_wm_win_type_dialog,
@@ -922,4 +996,35 @@ void send_conf_req(WM *wm, Client *c, int width, int height, int x, int y){
     ev.override_redirect = False;
 
     XSendEvent(wm->dpy, c->win, False, StructureNotifyMask, (XEvent *)&ev);
+}
+
+bool get_any_strut(WM *wm, Dock *dock){
+    if(!dock) return false;
+
+    if(!get_strut_partial(wm, dock)){
+        if(!get_strut(wm, dock))
+            return false;
+    }
+
+    return true;
+}
+
+void handle_property_notify(WM *wm, XPropertyEvent *ev){
+    if(ev->atom == wm->atoms.net_wm_strut_partial || ev->atom == wm->atoms.net_wm_strut){
+        Dock *dock = win_in_docks(ev->window);
+        if(!dock)
+            return;
+
+        get_any_strut(wm, dock);
+        recalc_usable_area(wm);
+    }
+}
+
+Dock *win_in_docks(Window win){
+    for(int i = 0; i < ndocks; i++){
+        if(win == docks[i].win)
+            return &docks[i];
+    }
+
+    return NULL;
 }

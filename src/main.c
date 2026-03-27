@@ -48,7 +48,8 @@ int main(void)
             SubstructureNotifyMask |
             EnterWindowMask |
             LeaveWindowMask |
-            FocusChangeMask);
+            FocusChangeMask |
+            PropertyChangeMask);
 
     XSync(wm.dpy, False);
 
